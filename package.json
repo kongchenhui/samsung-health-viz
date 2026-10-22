@@ -2,7 +2,7 @@
   "name": "samsung-health-viz",
   "version": "0.0.1",
   "private": true,
-  "description": "三星健康数据可视化（首期：骑行生涯）",
+  "description": "Samsung Health data visualizer — cycling as the first module",
   "main": "main.mjs",
   "type": "module",
   "scripts": {
@@ -28,10 +28,10 @@
     "vue-router": "^5.4.0"
   },
   "build": {
-    "appId": "com.kongchenhui.ridecareer",
-    "productName": "骑行生涯",
+    "appId": "com.kongchenhui.samsunghealthviz",
+    "productName": "Samsung Health Viz",
     "copyright": "Copyright © 2026 kongchenhui",
-    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "artifactName": "SamsungHealthViz-${version}-${arch}.${ext}",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -71,12 +71,12 @@
       "identity": null,
       "darkModeSupport": true,
       "extendInfo": {
-        "CFBundleDisplayName": "骑行生涯",
+        "CFBundleDisplayName": "Samsung Health Viz",
         "LSMinimumSystemVersion": "11.0"
       }
     },
     "dmg": {
-      "title": "骑行生涯 ${version}",
+      "title": "Samsung Health Viz ${version}",
       "contents": [
         {
           "x": 140,
@@ -106,8 +106,7 @@
         }
       ],
       "icon": "build/icon.ico",
-      "executableName": "RideCareer",
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "executableName": "SamsungHealthViz"
     },
     "nsis": {
       "oneClick": false,
@@ -116,7 +115,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "骑行生涯",
+      "shortcutName": "Samsung Health Viz",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     },
@@ -137,7 +136,7 @@
       ],
       "icon": "build/icon.png",
       "category": "Utility",
-      "synopsis": "Samsung Health 数据可视化（骑行生涯）",
+      "synopsis": "Samsung Health data visualizer (cycling first)",
       "maintainer": "kongchenhui"
     },
     "electronDownload": {

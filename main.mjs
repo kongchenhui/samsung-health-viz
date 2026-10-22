@@ -76,7 +76,7 @@ function createWindow() {
     minHeight: 700,
     show: false,
     backgroundColor: '#0b0f16',
-    title: '骑行生涯 · Samsung Health',
+    title: 'Samsung Health Viz',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -263,7 +263,7 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.setName('骑行生涯');
+app.setName('Samsung Health Viz');
 app.whenReady().then(() => {
   registerIpc();
   buildMenu();

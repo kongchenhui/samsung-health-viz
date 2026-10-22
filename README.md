@@ -1,7 +1,8 @@
-# 骑行生涯 · Samsung Health 可视化
+# Samsung Health Viz · 三星健康可视化
 
-把三星健康（Samsung Health）导出的数据包变成本地骑行生涯地图：**首期只做骑行**（`exercise_type = 11007`），
+把三星健康（Samsung Health）导出的数据包变成本地可视化桌面应用：**首期为骑行模块**（`exercise_type = 11007`），
 支持选择自己的数据包解析、全部骑行路线叠在地图上、单次骑行详情（轨迹按速度着色、速度/心率/海拔/恢复心率曲线、分段配速）。
+产品名用「Samsung Health Viz」，因为后续会继续接入步数、睡眠、心率等更多数据类型。
 
 ![生涯页](docs/screenshots/career.png)
 
@@ -67,11 +68,11 @@ pnpm dist:linux   # Linux：AppImage + deb（在 Linux 或 Docker/CI 上运行�
 
 | 平台 | 产物 | 说明 |
 |---|---|---|
-| macOS arm64 | `骑行生涯-0.1.0-arm64.dmg` | 拖拽安装（dmg target） |
-| macOS arm64 | `骑行生涯-0.1.0-arm64.pkg` | 安装到 `/Applications`（pkg target） |
-| macOS arm64 | `骑行生涯-0.1.0-arm64.zip` | 免安装（zip target） |
-| Windows x64 | `骑行生涯-0.1.0-x64.exe` | NSIS 安装包（可选安装目录、创建快捷方式） |
-| Windows x64 | `骑行生涯-0.1.0-x64.zip` | 便携版，解压后运行 `RideCareer.exe` |
+| macOS arm64 | `SamsungHealthViz-0.0.1-arm64.dmg` | 拖拽安装（dmg target） |
+| macOS arm64 | `SamsungHealthViz-0.0.1-arm64.pkg` | 安装到 `/Applications`（pkg target） |
+| macOS arm64 | `SamsungHealthViz-0.0.1-arm64.zip` | 免安装（zip target） |
+| Windows x64 | `SamsungHealthViz-0.0.1-x64.exe` | NSIS 安装包（可选安装目录、创建快捷方式） |
+| Windows x64 | `SamsungHealthViz-0.0.1-x64.zip` | 便携版，解压后运行 `SamsungHealthViz.exe` |
 | Linux x64 | `*.AppImage` / `*.deb` | AppImage 免安装 / deb 安装包 |
 
 说明：

@@ -18,9 +18,9 @@ import { pickZip, pickFolder } from '../store.js';
           <path d="M18 44l10-16h12l6 16M28 28l6 16M40 28l-2-8h8" fill="none" stroke="#ffb02e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </div>
-      <h1>把骑行生涯画在地图上</h1>
+      <h1>把三星健康数据画在地图上</h1>
       <p class="welcome-sub">
-        导入三星健康（Samsung Health）导出的数据包，自动解析骑行记录与 GPS 轨迹，生成本地骑行的生涯地图、年度统计与个人最佳。
+        导入三星健康（Samsung Health）导出的数据包，自动解析骑行记录与 GPS 轨迹，生成本地地图与统计。首期为骑行模块，后续将扩展到步数、睡眠、心率等更多数据。
       </p>
 
       <div class="dropzone">

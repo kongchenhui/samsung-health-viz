@@ -44,8 +44,8 @@ const exportLabel = computed(() => store.dataset?.meta?.exportTime?.slice(0, 10)
         </svg>
       </span>
       <div class="brand-text">
-        <b>骑行生涯</b>
-        <span>Samsung Health · Cycling</span>
+        <b>三星健康可视化</b>
+        <span>Samsung Health Viz · Cycling</span>
       </div>
     </div>
 

@@ -116,7 +116,7 @@ jobs:
           fi
       - uses: softprops/action-gh-release@v3
         with:
-          name: 骑行生涯 ${{ github.ref_name }}
+          name: Samsung Health Viz ${{ github.ref_name }}
           body_path: ${{ steps.notes.outputs.body_path }}
           generate_release_notes: ${{ steps.notes.outputs.body_path == '' }}
           files: |
