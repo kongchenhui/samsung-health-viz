@@ -6,6 +6,8 @@
 
 ![生涯页](docs/screenshots/career.png)
 
+> 界面截图使用一份**虚构的演示数据**（路线/时间/心率均为生成数据，账号与路径已脱敏），不含任何真实用户数据。
+
 ## 技术栈
 
 | 层 | 选型 |
@@ -142,7 +144,7 @@ samsung-health-viz/
 │   └── views/               # Welcome / Career / Rides / RideDetail / Data
 ├── scripts/dev.mjs          # 开发启动器（Vite + Electron）
 ├── scripts/check-coord-sys.mjs  # 坐标判定自检（改判定逻辑后先跑它）
-├── docs/screenshots/        # 界面截图
+├── docs/screenshots/        # 界面截图（虚构演示数据，已脱敏）
 └── dist/                    # 构建产物（pnpm build 生成）
 ```
 
