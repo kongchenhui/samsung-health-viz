@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     tags: ['v*']
+  # 网页上「发布 Release」时也触发（网页创建 tag/Release 不会产生 push 事件）
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -87,3 +90,31 @@ jobs:
           path: |
             release/*.AppImage
             release/*.deb
+
+  # 打 tag（v*）时，把三个平台的产物汇总后自动发布到 GitHub Release
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [mac, windows, linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: 列出产物（排查用）
+        run: find artifacts -type f -maxdepth 3 | sort
+      - uses: softprops/action-gh-release@v3
+        with:
+          name: 骑行生涯 ${{ github.ref_name }}
+          # 只发布安装包，不把 *.zip 压缩包放进 Release（zip 仍保留在 Actions 的 artifact 里，方便调试下载）
+          files: |
+            artifacts/*.dmg
+            artifacts/*.pkg
+            artifacts/*.exe
+            artifacts/*.AppImage
+            artifacts/*.deb
+          fail_on_unmatched_files: true
+          generate_release_notes: true
