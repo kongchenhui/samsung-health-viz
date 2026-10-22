@@ -1,12 +1,16 @@
 // 解析三星健康导出包（CSV + jsons），生成本应用需要的骑行数据集。
 // 纯 Node 模块：Electron 主进程与 scripts/prepare-data.mjs 共用。
 import fs from 'node:fs';
+import { buildDeviceIndex, detectCoordSys } from './coord-sys.mjs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
 
 /* ---------------- 通用工具 ---------------- */
 
 const ROOT_PREFIX_RE = /^[^/]+\//;
+
+/** 数据集结构版本：增加字段时 +1，旧缓存会被忽略并要求重新选择数据包 */
+export const SCHEMA = 3;
 
 export function folderReader(root) {
   const files = [];
@@ -255,6 +259,7 @@ const T = {
   weather: /^com\.samsung\.shealth\.exercise\.weather\.\d+\.csv$/,
   recovery: /^com\.samsung\.shealth\.exercise\.recovery_heart_rate\.\d+\.csv$/,
   heartRate: /^com\.samsung\.shealth\.tracker\.heart_rate\.\d+\.csv$/,
+  deviceProfile: /^com\.samsung\.health\.device_profile\.\d+\.csv$/,
   bestRecords: /^com\.samsung\.shealth\.best_records\.\d+\.csv$/,
   sleep: null,
 };
@@ -276,6 +281,12 @@ export function buildCyclingDataset(reader, opts = {}) {
   const exFile = findCsv(reader, T.exercise);
   if (!exFile) throw new Error('这个目录/压缩包里找不到 com.samsung.shealth.exercise.*.csv，可能不是三星健康导出包');
   const ex = parseSamsungCsv(reader.readText(exFile));
+
+  // 坐标基准判定逻辑集中在 core/coord-sys.mjs（含实测依据、判定顺序与修改指引）
+  const deviceFile = findCsv(reader, T.deviceProfile);
+  const deviceIndex = deviceFile
+    ? buildDeviceIndex(parseSamsungCsv(reader.readText(deviceFile)).records)
+    : new Map();
 
   const weatherFile = findCsv(reader, T.weather);
   const weatherByExercise = new Map();
@@ -330,6 +341,10 @@ export function buildCyclingDataset(reader, opts = {}) {
       onProgress(`解析轨迹与心率 ${ri + 1}/${cyclingRecs.length}`, 12 + Math.round((80 * ri) / Math.max(1, cyclingRecs.length)));
     }
     const id = pick(rec, 'datauuid');
+    const deviceuuid = pick(rec, 'deviceuuid');
+    const device = deviceIndex.get(deviceuuid);
+    // 默认值：无轨迹的骑行只用它；有轨迹时下面读到 location_data.json 后会按点格式重判
+    let coordSys = detectCoordSys(device, null);
     const startMs = parseUtcMs(pick(rec, 'start_time'));
     const endMs = parseUtcMs(pick(rec, 'end_time'));
     const durationMs = num(pick(rec, 'duration')) ?? (endMs != null && startMs != null ? endMs - startMs : null);
@@ -352,6 +367,8 @@ export function buildCyclingDataset(reader, opts = {}) {
     if (locFile) {
       try {
         const raw = reader.readJson(jsonPath('com.samsung.shealth.exercise', locFile));
+        // 按“轨迹点格式（version）+ 设备类型回退”判定坐标基准
+        coordSys = detectCoordSys(device, raw);
         let pts = [];
         for (const p of raw) {
           if (p == null || p.latitude == null || p.longitude == null) continue;
@@ -528,6 +545,8 @@ export function buildCyclingDataset(reader, opts = {}) {
 
     const ride = {
       id,
+      deviceuuid,
+      coordSys,
       date: fmtLocal(startMs).slice(0, 10),
       start: fmtLocal(startMs),
       end: fmtLocal(effectiveEnd),
@@ -558,7 +577,7 @@ export function buildCyclingDataset(reader, opts = {}) {
 
   const name = detectPackageName(reader.label);
   const meta = {
-    schema: 1,
+    schema: SCHEMA,
     kind: 'samsung-health-cycling',
     packageName: name.packageName,
     exportTime: name.exportTime,

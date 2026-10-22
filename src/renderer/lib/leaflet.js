@@ -1,25 +1,79 @@
-// 底图与坐标系工具（数据为 WGS-84；高德瓦片为 GCJ-02，需要纠偏）
+// 底图主题与地图工具
+//
+// 坐标说明（重要，按底图分别处理）：
+// 三星健康导出的 GPS 是 WGS-84。
+//  - 高德栅格瓦片（矢量/卫星）：瓦片是 GCJ-02 网格，需要 WGS→GCJ 纠偏（实测同一瓦片与 OSM 相比，
+//    水岸线整体偏移约 425m 东 / 237m 南，正是 GCJ 偏移量）；
+//  - Esri 卫星影像、OSM：WGS-84 网格，直接叠加，不做纠偏（实测 Esri 画布与 OSM 同瓦片偏移 < 40m）。
+// 调试：URL 加 ?proj=raw / ?proj=gcj 可强制指定投影方式。
 import L from 'leaflet';
 
+const AMAP_URL =
+  'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}';
+const AMAP_OPTS = { subdomains: '1234', maxZoom: 18, attribution: '© 高德地图' };
+
+const ARCGIS = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+const SATELLITE = `${ARCGIS}/World_Imagery/MapServer/tile/{z}/{y}/{x}`;
+
 export const TILES = {
-  amap: {
-    url: 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
-    options: { subdomains: '1234', maxZoom: 18, attribution: '© 高德地图' },
+  // 高德暗色：复用高德瓦片 + CSS 反色滤镜压暗，保留中文地名，彩色轨迹更突出
+  'amap-dark': {
+    url: AMAP_URL,
+    options: AMAP_OPTS,
+    cssClass: 'tiles-invert',
     gcj: true,
+    attribution: '© 高德地图',
+  },
+  amap: {
+    url: AMAP_URL,
+    options: AMAP_OPTS,
+    gcj: true,
+    attribution: '© 高德地图',
+  },
+  // 高德卫星 + 中文标注
+  'amap-sat': {
+    url: 'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
+    options: { subdomains: '1234', maxZoom: 18, attribution: '© 高德地图' },
+    reference: {
+      url: 'https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}',
+      options: { subdomains: '1234', maxZoom: 18 },
+    },
+    gcj: true,
+    attribution: '© 高德地图',
   },
   satellite: {
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    url: SATELLITE,
     options: { maxZoom: 19, attribution: '© Esri, Maxar, Earthstar Geographics' },
-    gcj: false,
+    attribution: '© Esri',
   },
-  plain: { url: null, options: {}, gcj: false },
+  osm: {
+    url: 'https://tile.openstreetmap.de/{z}/{x}/{y}.png',
+    options: { maxZoom: 19, attribution: '© OpenStreetMap contributors' },
+    attribution: '© OpenStreetMap contributors',
+  },
+  plain: { url: null, options: {}, attribution: '' },
 };
 
 export const MAP_STYLE_OPTIONS = [
-  { value: 'amap', label: '高德地图（中文）' },
+  { value: 'amap-dark', label: '高德 · 暗色（推荐）' },
+  { value: 'amap', label: '高德 · 标准' },
+  { value: 'amap-sat', label: '高德 · 卫星（中文标注）' },
   { value: 'satellite', label: '卫星影像' },
+  { value: 'osm', label: 'OpenStreetMap' },
   { value: 'plain', label: '无底图（离线）' },
 ];
+
+export function makeMap(el) {
+  const map = L.map(el, {
+    zoomControl: true,
+    attributionControl: true,
+    preferCanvas: true,
+    zoomSnap: 0.25,
+    wheelPxPerZoomLevel: 90,
+  });
+  map.attributionControl.setPrefix(false);
+  return map;
+}
 
 const PI = Math.PI;
 const AA = 6378245.0;
@@ -45,7 +99,7 @@ function transformLon(x, y) {
   return ret;
 }
 
-/** WGS-84 → GCJ-02（中国大陆内有效） */
+/** WGS-84 → GCJ-02 */
 export function wgs2gcj(lat, lon) {
   if (outOfChina(lat, lon)) return [lat, lon];
   let dLat = transformLat(lon - 105.0, lat - 35.0);
@@ -59,32 +113,62 @@ export function wgs2gcj(lat, lon) {
   return [lat + dLat, lon + dLon];
 }
 
-export function makeMap(el) {
-  const map = L.map(el, {
-    zoomControl: true,
-    attributionControl: true,
-    preferCanvas: true,
-    zoomSnap: 0.25,
-    wheelPxPerZoomLevel: 90,
-  });
-  map.attributionControl.setPrefix(false);
-  return map;
+/** GCJ-02 → WGS-84（迭代反算，误差 < 1m） */
+export function gcj2wgs(lat, lon) {
+  if (outOfChina(lat, lon)) return [lat, lon];
+  let wgsLat = lat;
+  let wgsLon = lon;
+  for (let i = 0; i < 3; i++) {
+    const [gLat, gLon] = wgs2gcj(wgsLat, wgsLon);
+    wgsLat -= gLat - lat;
+    wgsLon -= gLon - lon;
+  }
+  return [wgsLat, wgsLon];
 }
 
-export function applyTiles(map, style) {
+/**
+ * 底图是否使用 GCJ-02 网格。
+ * 目前只有高德三个主题（暗色 / 标准 / 卫星）标记了 gcj: true；
+ * Esri 卫星、OSM、无底图都是 WGS-84 Web Mercator 网格。
+ *
+ * @param {string} style 底图主题名
+ * @returns {boolean}
+ */
+export function basemapIsGcj(style) {
   const conf = TILES[style] || TILES.plain;
-  if (map._tileLayer) {
-    map.removeLayer(map._tileLayer);
-    map._tileLayer = null;
-  }
-  if (conf.url) {
-    map._tileLayer = L.tileLayer(conf.url, conf.options).addTo(map);
-  }
+  return !!conf.gcj;
 }
 
-export function projectPoint(style, lat, lon) {
-  const conf = TILES[style] || TILES.plain;
-  return conf.gcj ? wgs2gcj(lat, lon) : [lat, lon];
+/**
+ * 投影：把轨迹坐标换算到底图坐标系。
+ *
+ * 换算矩阵（轨迹基准由 core/coord-sys.mjs 的 detectCoordSys 判定）：
+ *   | 轨迹 coordSys | 底图 GCJ-02（高德） | 底图 WGS-84（OSM/卫星） |
+ *   |---------------|---------------------|--------------------------|
+ *   | wgs84（手表）  | wgs2gcj 纠偏         | 直通                     |
+ *   | gcj02（手机）  | 直通                 | gcj2wgs 反算             |
+ *
+ * 调试：URL 加 ?proj=raw 强制直通；?proj=gcj 强制 WGS→GCJ。
+ *
+ * @param {string} style 底图主题名
+ * @param {number} lat
+ * @param {number} lon
+ * @param {'wgs84'|'gcj02'} coordSys 轨迹坐标基准（来自 core/coord-sys.mjs）
+ * @returns {[number, number]}
+ */
+export function projectPoint(style, lat, lon, coordSys = 'wgs84') {
+  let mode = null;
+  try {
+    mode = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('proj') : null;
+  } catch {
+    mode = null;
+  }
+  if (mode === 'raw') return [lat, lon];
+  if (mode === 'gcj') return wgs2gcj(lat, lon);
+
+  const isGcjData = coordSys === 'gcj02';
+  if (basemapIsGcj(style)) return isGcjData ? [lat, lon] : wgs2gcj(lat, lon);
+  return isGcjData ? gcj2wgs(lat, lon) : [lat, lon];
 }
 
 export function speedColor(v, p5, p95) {
@@ -96,7 +180,8 @@ export function speedColor(v, p5, p95) {
     [0.65, [250, 204, 21]],
     [1, [248, 113, 113]],
   ];
-  let a = stops[0], b = stops[stops.length - 1];
+  let a = stops[0];
+  let b = stops[stops.length - 1];
   for (let i = 0; i < stops.length - 1; i++) {
     if (t >= stops[i][0] && t <= stops[i + 1][0]) {
       a = stops[i];
@@ -107,4 +192,18 @@ export function speedColor(v, p5, p95) {
   const k = (t - a[0]) / Math.max(1e-6, b[0] - a[0]);
   const c = a[1].map((x, i) => Math.round(x + (b[1][i] - x) * k));
   return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+}
+
+/** 按主题创建底图图层（含可选的标注参考层），返回 { base, reference, cssClass } */
+export function createTileLayers(style, L) {
+  const conf = TILES[style] || TILES.plain;
+  const base = conf.url ? L.tileLayer(conf.url, conf.options) : null;
+  const reference = conf.reference ? L.tileLayer(conf.reference.url, conf.reference.options) : null;
+  return { base, reference, cssClass: conf.cssClass || '', attribution: conf.attribution || '' };
+}
+
+/** 底图淡化：0 不淡化，100 最淡（保留最小可辨识度） */
+export function tileOpacity(dimPercent) {
+  const d = Math.max(0, Math.min(100, Number(dimPercent) || 0));
+  return 1 - (d / 100) * 0.82;
 }

@@ -13,7 +13,7 @@
 | 渲染 | Vue 3（SFC + `<script setup>`）+ vue-router（hash 模式） |
 | 构建 | Vite 8 + `@vitejs/plugin-vue` |
 | 图表 | ECharts 6 + vue-echarts（折线、柱状、日历热力） |
-| 地图 | Leaflet 1.9（高德 / ArcGIS 卫星 / 离线无底图，自动做 WGS-84 → GCJ-02 纠偏） |
+| 地图 | Leaflet 1.9（高德暗色/标准/卫星、Esri 卫星、OSM、离线无底图；轨迹描边 + 底图淡化） |
 | 数据 | `adm-zip` 直接读取用户选择的 ZIP；CSV 自行解析（三星导出格式：两行文件头 + 行尾空字段） |
 
 ## 运行
@@ -27,6 +27,31 @@ pnpm dev            # 开发：Vite dev server + Electron（改渲染代码热�
 pnpm build          # 构建渲染层
 pnpm start          # 以构建产物启动 Electron
 ```
+
+## 地图主题与轨迹可读性
+
+生涯页/详情页右上角可切换底图，并在「底图淡化」滑杆调节底图强度（轨迹会带深色描边，任何底图下都能看清）：
+
+- **高德 · 暗色（默认）**：压暗后的高德矢量图 + 中文地名，彩色轨迹最醒目；
+- 高德 · 标准 / 高德 · 卫星（中文标注）/ Esri 卫星；
+- OpenStreetMap（WGS-84 参考底图，可用来核对轨迹是否贴合道路）；
+- 无底图（离线，纯轨迹 + 深色网格）。
+
+> 坐标说明（混合坐标系，按数据本身的来源自动判定）：
+> - 三星健康导出里**没有**显式的“坐标基准”字段，但轨迹 JSON 会暴露来源格式：
+>   **手机 App 写入的轨迹点带 `version` 字段**（对应的 `location_data_internal` 还有 `source_type`），
+>   **手表记录的轨迹点没有**；
+> - 手机（Galaxy/OnePlus 都一样）的定位由系统定位服务/地图 SDK 给出 → **GCJ-02**；
+>   手表的 GNSS 原始定位 → **WGS-84**（这也是为什么手机上的三星健康显示正常：它在渲染时按来源换算）；
+> - 解析时按「点格式（version）→ 设备类型（device_profile 里 10061=穿戴）回退」判定每条骑行的 `coordSys`，
+>   渲染时再按「轨迹基准 ↔ 底图基准」换算：高德（GCJ-02）与 WGS-84 轨迹 → 纠偏、与 GCJ-02 轨迹 → 直通；
+>   OSM/卫星（WGS-84）与 GCJ-02 轨迹 → 反算回 WGS-84。
+>
+> 全部 31 条轨迹抽样 1966 个点做水面命中校验：高德底图 17 点、OSM 12 点（均为桥/堤等真实过水点），
+> 说明两条链路都已对齐。调试可用 `?proj=raw|gcj` 强制指定。
+>
+> 之前还有一个「深灰/浅灰画布（Esri Canvas）」主题：其中国区矢量数据与 WGS-84 网格本身存在约 500m 错位且非常稀疏，
+> 会让轨迹“看起来偏移”，已从主题列表中移除；需要暗色底图请用「高德 · 暗色」。
 
 ## 打包安装包（electron-builder 原生 target）
 
@@ -96,7 +121,8 @@ docker run --rm --platform linux/amd64 -v "$PWD/release:/out" ridecareer-win
 - `exercise.weather` / `exercise.recovery_heart_rate`：按 `exercise_id` 关联天气与恢复心率。
 
 其他要点：CSV 首行是元信息、第二行才是表头；数据行末尾多一个空字段；所有时刻均为 UTC（+8 为北京时间）；
-`day_time` 是本地日期锚点。坐标系为 WGS-84，使用高德底图时自动纠偏。
+`day_time` 是本地日期锚点。轨迹坐标基准按来源区分（手表 WGS-84 / 手机 App GCJ-02），由 `src/core/coord-sys.mjs` 判定；
+底图中高德栅格是 GCJ-02、Esri 卫星与 OSM 是 WGS-84，渲染时按「轨迹基准 ↔ 底图基准」换算（详见 `src/renderer/lib/leaflet.js` 的 `projectPoint`）。
 
 ## 项目结构
 
@@ -104,13 +130,15 @@ docker run --rm --platform linux/amd64 -v "$PWD/release:/out" ridecareer-win
 samsung-health-viz/
 ├── main.mjs                 # Electron 主进程：窗口、数据包选择、解析、缓存、截图调试
 ├── preload.cjs              # contextBridge 暴露 window.api
-├── src/core/parse.mjs       # 数据包解析（CSV/JSOSN/ZIP/目录），输出骑行数据集
+├── src/core/parse.mjs       # 数据包解析（CSV/JSON/ZIP/目录），输出骑行数据集
+├── src/core/coord-sys.mjs   # 坐标基准判定（wgs84 / gcj02，含实测依据与判定顺序）
 ├── src/renderer/
 │   ├── main.js  App.vue  router.js  store.js
-│   ├── lib/                 # format / data 派生统计 / leaflet 底图与坐标纠偏
+│   ├── lib/                 # format / data 派生统计 / leaflet 底图主题
 │   ├── components/          # TitleBar、MapPanel、LineChart、BarChart、MonthHeatmap…
 │   └── views/               # Welcome / Career / Rides / RideDetail / Data
 ├── scripts/dev.mjs          # 开发启动器（Vite + Electron）
+├── scripts/check-coord-sys.mjs  # 坐标判定自检（改判定逻辑后先跑它）
 ├── docs/screenshots/        # 界面截图
 └── dist/                    # 构建产物（pnpm build 生成）
 ```

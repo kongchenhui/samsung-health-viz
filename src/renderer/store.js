@@ -6,7 +6,8 @@ export const store = reactive({
   platform: '',
   info: null,
   dataset: null,
-  mapStyle: 'amap',
+  mapStyle: 'amap-dark',
+  mapDim: 18, // 底图淡化（0-100），让轨迹更突出
   yearFilter: 'all',
 });
 
@@ -47,6 +48,11 @@ export async function boot() {
   } catch (e) {
     console.error('info failed', e);
   }
+  // 支持 URL 参数调试/深链：?map=amap-dark&dim=40
+  const params = new URLSearchParams(location.search);
+  if (params.get('map')) store.mapStyle = params.get('map');
+  if (params.get('dim') !== null && params.get('dim') !== '') store.mapDim = Number(params.get('dim'));
+
   const cached = await window.api.loadCached();
   if (cached?.ok) {
     store.dataset = cached.data;

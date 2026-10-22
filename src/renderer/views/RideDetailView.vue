@@ -135,12 +135,16 @@ const stats = computed(() => {
             <i class="speed-gradient"></i>
             <span>快</span>
           </div>
+          <label class="dim-control" title="底图淡化：调高后底图更淡，轨迹更突出">
+            <span>底图淡化</span>
+            <input v-model.number="store.mapDim" type="range" min="0" max="100" step="1" />
+          </label>
           <select v-model="store.mapStyle" class="select">
             <option v-for="o in MAP_STYLE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>
       </div>
-      <MapPanel v-if="ride.hasTrack" mode="detail" :segments="segments" :map-style="store.mapStyle" />
+      <MapPanel v-if="ride.hasTrack" mode="detail" :segments="segments" :map-style="store.mapStyle" :coord-sys="ride.coordSys || 'wgs84'" :dim="store.mapDim" />
       <div v-else class="map-empty">
         这次骑行没有记录 GPS 轨迹（可能手表未定位或为室内骑行），下方仍有速度/心率数据。
       </div>

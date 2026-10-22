@@ -110,6 +110,8 @@ const tracks = computed(() =>
     id: r.id,
     color: yearColor(r.date),
     points: r.track.lat.map((lat, i) => [lat, r.track.lon[i]]),
+    // 每条轨迹的坐标基准（手表 wgs84 / 手机 gcj02），混绘时必须逐条带上，否则会整体偏移
+    coordSys: r.coordSys || 'wgs84',
     tooltipHtml: rideTooltipHtml(r),
     opacity: store.yearFilter === 'all' ? 0.7 : 0.92,
     weight: clusterKey.value === 'all' ? 3 : 4,
@@ -173,6 +175,10 @@ function openRide(id) {
             骑行路线
             <span class="muted small">{{ activeClusterLabel }} · {{ tracks.length }} 条轨迹</span>
           </h3>
+          <label class="dim-control" title="底图淡化：调高后底图更淡，轨迹更突出">
+            <span>底图淡化</span>
+            <input v-model.number="store.mapDim" type="range" min="0" max="100" step="1" />
+          </label>
           <select v-model="store.mapStyle" class="select">
             <option v-for="o in MAP_STYLE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
@@ -208,7 +214,7 @@ function openRide(id) {
           </div>
         </div>
 
-        <MapPanel mode="career" :tracks="tracks" :map-style="store.mapStyle" @pick="openRide" />
+        <MapPanel mode="career" :tracks="tracks" :map-style="store.mapStyle" :dim="store.mapDim" @pick="openRide" />
         <div class="map-foot">
           <span v-for="y in years" :key="y" class="legend-item">
             <i :style="{ background: yearColor(`${y}-01-01`) }"></i>{{ y }}

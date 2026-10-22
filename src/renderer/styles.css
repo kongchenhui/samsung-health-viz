@@ -1267,3 +1267,84 @@ body.platform-win32 .titlebar,
 body.platform-linux .titlebar {
   padding-right: 158px;
 }
+
+/* ---------- 底图主题与淡化 ---------- */
+/* 高德暗色：反色滤镜压暗底图，彩色轨迹保持鲜艳 */
+.map-panel.tiles-invert .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) saturate(0.55) brightness(0.92) contrast(0.92);
+}
+
+.dim-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.dim-control input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 92px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 176, 46, 0.55), rgba(255, 255, 255, 0.12));
+  outline: none;
+  cursor: pointer;
+}
+.dim-control input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #0b0f16;
+  box-shadow: 0 0 0 1px rgba(255, 176, 46, 0.5);
+}
+
+/* ---------- 宽屏适配：内容用满窗口，右侧栏填满地图高度 ---------- */
+@media (min-width: 1700px) {
+  .page {
+    max-width: 1860px;
+  }
+  .career-top {
+    grid-template-columns: minmax(0, 1fr) 380px;
+  }
+}
+
+/* 右侧栏：年份卡固定、个人最佳卡拉伸填满地图卡片高度，避免大片空白 */
+.side-col {
+  height: 100%;
+}
+.side-col > .card {
+  display: flex;
+  flex-direction: column;
+}
+.side-col > .pb-card {
+  flex: 1;
+}
+.pb-card .pb-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.pb-card .pb-list li {
+  flex: 1;
+  border-bottom: 1px solid var(--line-soft);
+}
+.pb-card .pb-list li:last-child {
+  border-bottom: none;
+}
+
+/* 底部两块：日历 + 最近骑行并排（窄屏自动堆叠） */
+.career-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1400px) {
+  .career-bottom {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

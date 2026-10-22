@@ -3,7 +3,7 @@ import { app, BrowserWindow, Menu, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { folderReader, zipReader, buildCyclingDataset, resolvePackageDir } from './src/core/parse.mjs';
+import { folderReader, zipReader, buildCyclingDataset, resolvePackageDir, SCHEMA } from './src/core/parse.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isMac = process.platform === 'darwin';
@@ -28,6 +28,8 @@ function readCache() {
     const raw = fs.readFileSync(cacheFile(), 'utf8');
     const data = JSON.parse(raw);
     if (!data?.rides?.length) return null;
+    // 数据集结构升级（如新增坐标基准字段）后，旧缓存不再兼容，要求重新选择数据包
+    if (data?.meta?.schema !== SCHEMA) return null;
     return data;
   } catch {
     return null;
