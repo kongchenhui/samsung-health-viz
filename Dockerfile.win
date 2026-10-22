@@ -1,0 +1,14 @@
+# 在任意装有 Docker 的机器上构建 Windows 安装包（不需要本机 wine / Rosetta）
+# 用法：
+#   docker build --platform linux/amd64 -f Dockerfile.win -t ridecareer-win .
+#   docker run --rm --platform linux/amd64 -v "$PWD/release:/out" ridecareer-win
+FROM electronuserland/builder:wine
+
+RUN corepack enable
+
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY . .
+
+CMD ["bash", "-lc", "pnpm dist:win && mkdir -p /out && cp -f release/*.exe release/*.zip /out/ 2>/dev/null || true"]

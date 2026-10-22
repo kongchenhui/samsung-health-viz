@@ -1,0 +1,150 @@
+{
+  "name": "samsung-health-viz",
+  "version": "0.1.0",
+  "private": true,
+  "description": "三星健康数据可视化（首期：骑行生涯）",
+  "main": "main.mjs",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "vite build",
+    "start": "electron .",
+    "dist:mac": "vite build && electron-builder --mac --arm64 --publish never",
+    "dist:win": "vite build && electron-builder --win --x64 --publish never",
+    "dist:linux": "vite build && electron-builder --linux --x64 --publish never"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.10",
+    "echarts": "^6.1.0",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.15.3",
+    "leaflet": "^1.9.4",
+    "vite": "^8.3.5",
+    "vue": "^3.5.44",
+    "vue-echarts": "^8.3.2",
+    "vue-router": "^5.4.0"
+  },
+  "build": {
+    "appId": "com.kongchenhui.ridecareer",
+    "productName": "骑行生涯",
+    "copyright": "Copyright © 2026 kongchenhui",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.mjs",
+      "preload.cjs",
+      "src/core/**/*",
+      "dist/renderer/**/*",
+      "!**/*.map"
+    ],
+    "asar": false,
+    "afterPack": "scripts/after-pack.cjs",
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "pkg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.healthcare-fitness",
+      "icon": "build/icon.icns",
+      "identity": null,
+      "darkModeSupport": true,
+      "extendInfo": {
+        "CFBundleDisplayName": "骑行生涯",
+        "LSMinimumSystemVersion": "11.0"
+      }
+    },
+    "dmg": {
+      "title": "骑行生涯 ${version}",
+      "contents": [
+        {
+          "x": 140,
+          "y": 220
+        },
+        {
+          "x": 420,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "executableName": "RideCareer",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "骑行生涯",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "synopsis": "Samsung Health 数据可视化（骑行生涯）",
+      "maintainer": "kongchenhui"
+    },
+    "electronDownload": {
+      "cache": ".cache/electron"
+    }
+  },
+  "author": {
+    "name": "kongchenhui"
+  }
+}
