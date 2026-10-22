@@ -92,7 +92,7 @@ pnpm dist:linux   # Linux：AppImage + deb（在 Linux 或 Docker/CI 上运行�
 - 手动触发、打 `v*` tag、或在网页发布 Release 时触发，自动在 `macos-14` / `windows-latest` / `ubuntu-latest` 三个 runner 上分别打包；
 - 产物以 artifact 形式上传（mac-arm64 / windows-x64 / linux-x64）；
 - 最后一个 `release` job 会把三平台安装包（dmg / pkg / zip / exe / AppImage / deb）汇总上传到对应的 GitHub Release；
-- Release 说明自动读取仓库里的 `docs/release-notes/<tag>.md`（如 `docs/release-notes/v0.1.1.md`），文件不存在时回退为自动生成。
+- Release 说明自动读取仓库里的 `docs/release-notes/<tag>.md`（如 `docs/release-notes/v0.0.1.md`），文件不存在时回退为自动生成。
 
 **Docker（在任意机器上构建 Windows 安装包）**：
 ```bash
