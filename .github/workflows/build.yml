@@ -106,10 +106,23 @@ jobs:
           merge-multiple: true
       - name: 列出产物（排查用）
         run: find artifacts -type f -maxdepth 3 | sort
+      - name: 读取 Release 说明
+        id: notes
+        shell: bash
+        run: |
+          f="docs/release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$f" ]; then
+            echo "body_path=$f" >> "$GITHUB_OUTPUT"
+            echo "使用 $f 作为 Release 说明"
+          else
+            echo "未找到 $f，回退为自动生成说明"
+          fi
       - uses: softprops/action-gh-release@v3
         with:
           name: 骑行生涯 ${{ github.ref_name }}
-          # 只发布安装包，不把 *.zip 压缩包放进 Release（zip 仍保留在 Actions 的 artifact 里，方便调试下载）
+          # Release 说明优先用仓库里的 docs/release-notes/<tag>.md；没有则自动生成
+          body_path: ${{ steps.notes.outputs.body_path }}
+          generate_release_notes: ${{ steps.notes.outputs.body_path == '' }}
           files: |
             artifacts/*.dmg
             artifacts/*.pkg
@@ -118,4 +131,3 @@ jobs:
             artifacts/*.AppImage
             artifacts/*.deb
           fail_on_unmatched_files: true
-          generate_release_notes: true
