@@ -1,6 +1,6 @@
 {
   "name": "samsung-health-viz",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "三星健康数据可视化（首期：骑行生涯）",
   "main": "main.mjs",
