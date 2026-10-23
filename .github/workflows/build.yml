@@ -39,7 +39,7 @@ jobs:
             release/*.pkg
             release/*.zip
             release/*.blockmap
-            release/*.yml
+            release/latest*.yml
 
   windows:
     runs-on: windows-latest
@@ -65,7 +65,7 @@ jobs:
             release/*.exe
             release/*.zip
             release/*.blockmap
-            release/*.yml
+            release/latest*.yml
 
   linux:
     runs-on: ubuntu-latest
@@ -91,7 +91,7 @@ jobs:
             release/*.AppImage
             release/*.deb
             release/*.blockmap
-            release/*.yml
+            release/latest*.yml
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -140,6 +140,6 @@ jobs:
             artifacts/*.exe
             artifacts/*.AppImage
             artifacts/*.deb
-            artifacts/*.yml
+            artifacts/latest*.yml
             artifacts/*.blockmap
           fail_on_unmatched_files: true
