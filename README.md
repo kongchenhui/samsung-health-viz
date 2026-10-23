@@ -70,17 +70,29 @@ pnpm dist:linux   # Linux：AppImage + deb（在 Linux 或 Docker/CI 上运行�
 
 | 平台 | 产物 | 说明 |
 |---|---|---|
-| macOS arm64 | `SamsungHealthViz-0.0.1-arm64.dmg` | 拖拽安装（dmg target） |
-| macOS arm64 | `SamsungHealthViz-0.0.1-arm64.pkg` | 安装到 `/Applications`（pkg target） |
-| macOS arm64 | `SamsungHealthViz-0.0.1-arm64.zip` | 免安装（zip target） |
-| Windows x64 | `SamsungHealthViz-0.0.1-x64.exe` | NSIS 安装包（可选安装目录、创建快捷方式） |
-| Windows x64 | `SamsungHealthViz-0.0.1-x64.zip` | 便携版，解压后运行 `SamsungHealthViz.exe` |
+| macOS arm64 | `SamsungHealthViz-0.0.2-arm64.dmg` | 拖拽安装（dmg target） |
+| macOS arm64 | `SamsungHealthViz-0.0.2-arm64.pkg` | 安装到 `/Applications`（pkg target） |
+| macOS arm64 | `SamsungHealthViz-0.0.2-arm64.zip` | 免安装（zip target） |
+| Windows x64 | `SamsungHealthViz-0.0.2-x64.exe` | NSIS 安装包（可选安装目录、创建快捷方式） |
+| Windows x64 | `SamsungHealthViz-0.0.2-x64.zip` | 便携版，解压后运行 `SamsungHealthViz.exe` |
 | Linux x64 | `*.AppImage` / `*.deb` | AppImage 免安装 / deb 安装包 |
 
 说明：
 - 应用图标：macOS 用 `build/icon.icns`，Windows 用 `build/icon.ico`，Linux 用 `build/icon.png`；
 - 签名：默认 `mac.identity: null` + `CSC_IDENTITY_AUTO_DISCOVERY=false`，即**不签名/不公证**。`scripts/after-pack.cjs` 只对 macOS `.app` 做 ad-hoc 签名，方便本机直接运行；正式分发请配置 Developer ID / 代码签名证书；
 - 未签名产物首次打开可能被 Gatekeeper / SmartScreen 拦截：mac 右键 → 打开，Windows 点「更多信息 → 仍要运行」。
+
+## 自动更新（增量更新）
+
+已集成 `electron-updater`，从 GitHub Release 检查并更新（`build.publish` 已配置为 GitHub）：
+
+- 应用启动 8 秒后检查一次，之后每 6 小时检查；菜单「帮助 → 检查更新…」可手动检查；
+- 增量更新依赖 electron-builder 生成的 `latest*.yml` + `*.blockmap`，CI 发布时已一并上传；
+- Windows（NSIS）：自动下载并按 blockmap 做**差量更新**，下载完成后提示重启安装；
+- Linux（AppImage）：自动下载并更新（同样支持 blockmap 差量）；deb 版不支持自动更新；
+- macOS：系统要求 Squirrel.Mac 校验代码签名，当前构建**未签名**，因此只会提示「发现新版本」并打开发布页，不会自动安装（更新包为整包 zip）；配置 Developer ID 签名后可开启自动安装。
+
+发布新版本：改 `package.json` 的 `version` → 新增 `docs/release-notes/vX.Y.Z.md` → 打 tag 推送，CI 自动构建并发布，已安装的客户端即可检查到更新。
 
 ### 跨平台/环境相关的两个小配置
 
@@ -92,10 +104,12 @@ pnpm dist:linux   # Linux：AppImage + deb（在 Linux 或 Docker/CI 上运行�
 本地机器缺工具链时（例如 Windows 安装包需要 wine / Rosetta，dmg 需要 macOS 的 hdiutil），交给 CI 或 Docker：
 
 **GitHub Actions**（`.github/workflows/build.yml`，已内置）：
-- 手动触发、打 `v*` tag、或在网页发布 Release 时触发，自动在 `macos-14` / `windows-latest` / `ubuntu-latest` 三个 runner 上分别打包；
+- 触发方式：手动触发，或推送 `v*` 版本 tag（推荐发布流程：`git tag v0.0.2 && git push origin v0.0.2`）；
+- 自动在 `macos-14` / `windows-latest` / `ubuntu-latest` 三个 runner 上分别打包；
 - 产物以 artifact 形式上传（mac-arm64 / windows-x64 / linux-x64）；
-- 最后一个 `release` job 会把三平台安装包（dmg / pkg / zip / exe / AppImage / deb）汇总上传到对应的 GitHub Release；
-- Release 说明自动读取仓库里的 `docs/release-notes/<tag>.md`（如 `docs/release-notes/v0.0.1.md`），文件不存在时回退为自动生成。
+- 最后一个 `release` job 会先校验 tag 与 `package.json` 的 `version` 一致，再把三平台安装包（dmg / pkg / zip / exe / AppImage / deb）汇总并**自动创建并发布**对应的 GitHub Release；
+- Release 说明自动读取仓库里的 `docs/release-notes/<tag>.md`（如 `docs/release-notes/v0.0.2.md`），文件不存在时回退为自动生成；
+- 发布统一走 tag 推送，不要在网页手动创建 Release（会和自动创建的 Release 冲突）。
 
 **Docker（在任意机器上构建 Windows 安装包）**：
 ```bash

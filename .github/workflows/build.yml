@@ -2,8 +2,9 @@ name: Build installers
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -38,6 +39,7 @@ jobs:
             release/*.pkg
             release/*.zip
             release/*.blockmap
+            release/*.yml
 
   windows:
     runs-on: windows-latest
@@ -63,6 +65,7 @@ jobs:
             release/*.exe
             release/*.zip
             release/*.blockmap
+            release/*.yml
 
   linux:
     runs-on: ubuntu-latest
@@ -87,6 +90,8 @@ jobs:
           path: |
             release/*.AppImage
             release/*.deb
+            release/*.blockmap
+            release/*.yml
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -97,6 +102,14 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+      - name: 校验 tag 与 package.json 版本一致
+        shell: bash
+        run: |
+          pkg="v$(node -p "require('./package.json').version")"
+          if [ "$pkg" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME 与 package.json 版本 $pkg 不一致"
+            exit 1
+          fi
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
@@ -116,6 +129,7 @@ jobs:
           fi
       - uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ github.ref_name }}
           name: Samsung Health Viz ${{ github.ref_name }}
           body_path: ${{ steps.notes.outputs.body_path }}
           generate_release_notes: ${{ steps.notes.outputs.body_path == '' }}
@@ -126,4 +140,6 @@ jobs:
             artifacts/*.exe
             artifacts/*.AppImage
             artifacts/*.deb
+            artifacts/*.yml
+            artifacts/*.blockmap
           fail_on_unmatched_files: true

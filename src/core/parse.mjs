@@ -10,7 +10,7 @@ import AdmZip from 'adm-zip';
 const ROOT_PREFIX_RE = /^[^/]+\//;
 
 /** 数据集结构版本：增加字段时 +1，旧缓存会被忽略并要求重新选择数据包 */
-export const SCHEMA = 3;
+export const SCHEMA = 4;
 
 export function folderReader(root) {
   const files = [];
@@ -350,6 +350,9 @@ export function buildCyclingDataset(reader, opts = {}) {
     const durationMs = num(pick(rec, 'duration')) ?? (endMs != null && startMs != null ? endMs - startMs : null);
     if (startMs == null || durationMs == null) continue;
     const effectiveEnd = endMs ?? startMs + durationMs;
+    // 墙钟跨度（含自动暂停）：三星的 duration 是“运动时长”，不含暂停；而轨迹/live_data 的时间戳是墙钟时间。
+    // 若用 duration 裁剪，会把暂停之后的尾段（例如返程最后几分钟）整段截掉，轨迹看起来就“没闭合”。
+    const wallSpanMs = endMs != null && startMs != null && endMs > startMs ? endMs - startMs : durationMs;
 
     let distanceM = num(pick(rec, 'distance'));
     let calories = num(pick(rec, 'calorie')) ?? num(pick(rec, 'total_calorie'));
@@ -394,7 +397,7 @@ export function buildCyclingDataset(reader, opts = {}) {
           }
           if (picked[picked.length - 1] !== pts[pts.length - 1]) picked.push(pts[pts.length - 1]);
           const simplified = simplifyTrack(picked, 2.5)
-            .filter((p) => p.t == null || (p.t - startMs >= -30000 && p.t - startMs <= durationMs + 60000));
+            .filter((p) => p.t == null || (p.t - startMs >= -30000 && p.t - startMs <= wallSpanMs + 60000));
           if (simplified.length >= 2) track = { pts: simplified };
         }
       } catch (e) {
@@ -413,7 +416,7 @@ export function buildCyclingDataset(reader, opts = {}) {
         for (const p of live) {
           if (p.start_time == null) continue;
           const t = (p.start_time - startMs) / 1000;
-          if (t < -5 || t > durationMs / 1000 + 5) continue;
+          if (t < -5 || t > wallSpanMs / 1000 + 5) continue;
           if (p.speed != null && Number.isFinite(p.speed) && p.speed >= 0 && p.speed <= 20) {
             speedPts.push([+t.toFixed(1), +p.speed.toFixed(2)]);
           }

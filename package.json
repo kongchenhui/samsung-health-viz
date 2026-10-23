@@ -1,6 +1,6 @@
 {
   "name": "samsung-health-viz",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Samsung Health data visualizer — cycling as the first module",
   "main": "main.mjs",
@@ -14,7 +14,8 @@
     "dist:linux": "vite build && electron-builder --linux --x64 --publish never"
   },
   "dependencies": {
-    "adm-zip": "^0.6.1"
+    "adm-zip": "^0.6.1",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.10",
@@ -45,6 +46,11 @@
     ],
     "asar": false,
     "afterPack": "scripts/after-pack.cjs",
+    "publish": {
+      "provider": "github",
+      "owner": "kongchenhui",
+      "repo": "samsung-health-viz"
+    },
     "mac": {
       "target": [
         {

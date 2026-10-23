@@ -2,8 +2,13 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { folderReader, zipReader, buildCyclingDataset, resolvePackageDir, SCHEMA } from './src/core/parse.mjs';
+
+// electron-updater 是 CJS 包，主进程是 ESM，用 createRequire 引入最稳
+const require = createRequire(import.meta.url);
+const { autoUpdater } = require('electron-updater');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isMac = process.platform === 'darwin';
@@ -226,6 +231,100 @@ function registerIpc() {
   });
 }
 
+/* ---------- 自动更新（electron-updater + GitHub Release） ---------- */
+const RELEASE_PAGE = 'https://github.com/kongchenhui/samsung-health-viz/releases/latest';
+// macOS 未签名时 Squirrel.Mac 无法校验并安装更新，只能提示去发布页手动下载；
+// Windows（NSIS）与 Linux（AppImage）可自动下载，并按 blockmap 做增量更新。
+const canAutoInstall = process.platform !== 'darwin';
+let manualUpdateCheck = false;
+
+function setupAutoUpdate() {
+  if (!app.isPackaged) return; // 开发模式不检查更新
+  autoUpdater.autoDownload = canAutoInstall;
+  autoUpdater.autoInstallOnAppQuit = canAutoInstall;
+
+  autoUpdater.on('update-available', (info) => {
+    if (canAutoInstall) return; // 自动下载完成后在 update-downloaded 里提示
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: '发现新版本',
+      message: `Samsung Health Viz ${info.version} 已发布`,
+      detail: 'macOS 版暂不支持自动安装（应用未签名），请打开发布页手动下载安装包。',
+      buttons: ['打开发布页', '稍后'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) shell.openExternal(RELEASE_PAGE);
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: '更新已就绪',
+      message: `Samsung Health Viz ${info.version} 已下载`,
+      detail: '重启应用后自动安装新版本。',
+      buttons: ['立即重启', '稍后'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.quitAndInstall(false, true);
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    if (!manualUpdateCheck) return;
+    manualUpdateCheck = false;
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: '已是最新版本',
+      message: `当前版本 ${app.getVersion()} 已是最新`,
+      buttons: ['好'],
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('[update] 失败：', err);
+    const wasManual = manualUpdateCheck;
+    manualUpdateCheck = false;
+    if (!wasManual) return;
+    dialog.showMessageBox(win, {
+      type: 'warning',
+      title: '检查更新失败',
+      message: '暂时无法检查更新',
+      detail: String(err?.message || err),
+      buttons: ['打开发布页', '关闭'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) shell.openExternal(RELEASE_PAGE);
+    });
+  });
+
+  const check = (manual) => {
+    manualUpdateCheck = manual;
+    autoUpdater.checkForUpdates().catch((e) => console.error('[update] 检查失败：', e));
+  };
+  // 启动 8 秒后检查一次，之后每 6 小时检查一次
+  setTimeout(() => check(false), 8000);
+  setInterval(() => check(false), 6 * 60 * 60 * 1000);
+}
+
+async function checkUpdatesManually() {
+  if (!app.isPackaged) {
+    await dialog.showMessageBox(win, {
+      type: 'info',
+      title: '开发模式',
+      message: '开发模式下不检查更新',
+      detail: '用构建后的安装包运行时才会检查 GitHub Release。',
+      buttons: ['好'],
+    });
+    return;
+  }
+  manualUpdateCheck = true;
+  autoUpdater.checkForUpdates().catch((e) => console.error('[update] 检查失败：', e));
+}
+
 /* ---------- 菜单（保留常用项，避免默认 Electron 英文菜单） ---------- */
 function buildMenu() {
   const template = [
@@ -259,6 +358,13 @@ function buildMenu() {
         { role: 'close', label: '关闭窗口' },
       ],
     },
+    {
+      label: '帮助',
+      submenu: [
+        { label: `检查更新…（当前 ${app.getVersion()}）`, click: () => checkUpdatesManually() },
+        { label: '打开发布页', click: () => shell.openExternal(RELEASE_PAGE) },
+      ],
+    },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -268,6 +374,7 @@ app.whenReady().then(() => {
   registerIpc();
   buildMenu();
   createWindow();
+  setupAutoUpdate();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
