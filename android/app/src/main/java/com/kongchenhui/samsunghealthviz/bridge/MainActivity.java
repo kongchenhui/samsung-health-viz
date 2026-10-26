@@ -27,12 +27,14 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
@@ -52,6 +54,7 @@ public final class MainActivity extends Activity {
     private static final String PREF_IP = "last_ip";
     private static final String PREF_PORT = "last_port";
     private static final String PREF_TREE = "last_tree_uri";
+    private static final String PREF_COMPRESS = "compress_zip";
     private static final int DEFAULT_PORT = 8737;
     private static final int REQUEST_PICK_DIR = 41;
     private static final long SCAN_TIMEOUT_MS = 12_000L;
@@ -81,12 +84,17 @@ public final class MainActivity extends Activity {
     private SharedPreferences prefs;
     private volatile boolean destroyed;
     private boolean analyzing;
+    private boolean packing;
     private boolean uploading;
 
     private ExportTree tree;
-    private ExportTree.Stats stats;
+    private ZipPacker packer;
+    private ZipPacker.Result packed;
+    private boolean cancelRequested;
+    private long uploadStartedAt;
 
     private EditText ipField;
+    private CheckBox compressCheck;
     private EditText portField;
     private EditText tokenField;
     private TextView connState;
@@ -160,7 +168,7 @@ public final class MainActivity extends Activity {
         root.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("选导出目录 → 打包 ZIP → 同一 Wi-Fi 直传电脑");
+        subtitle.setText("选导出目录 → 多线程打包 ZIP → 同一 Wi-Fi 直传电脑（先压缩后传输）");
         subtitle.setTextColor(C_TEXT_DIM);
         subtitle.setTextSize(13);
         subtitle.setLineSpacing(dp(3), 1f);
@@ -222,6 +230,27 @@ public final class MainActivity extends Activity {
     private void buildUploadCard(LinearLayout root) {
         LinearLayout card = card();
         card.addView(sectionTitle("③ 上传到电脑"));
+
+        addTo(card, bodyText(
+                "打包默认使用 deflate 压缩（省流量）。同一 Wi-Fi 下网络很快时，可以关闭压缩：打包更快，"
+                        + "但 ZIP 体积会接近导出目录的原始大小。",
+                C_TEXT_DIM), 0);
+
+        compressCheck = new CheckBox(this);
+        compressCheck.setText("压缩 ZIP（关闭后打包更快、包更大）");
+        compressCheck.setTextColor(C_TEXT);
+        compressCheck.setTextSize(13);
+        compressCheck.setButtonTintList(ColorStateList.valueOf(C_ACCENT));
+        compressCheck.setChecked(prefs.getBoolean(PREF_COMPRESS, true));
+        compressCheck.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean(PREF_COMPRESS, isChecked).apply();
+            // 压缩策略变了，旧的临时 ZIP 不能复用
+            if (packed != null) {
+                deletePacked();
+                uploadButton.setText("开始上传");
+            }
+        });
+        addTo(card, compressCheck, dp(10));
 
         uploadButton = actionButton("开始上传", true);
         uploadButton.setEnabled(false);
@@ -459,8 +488,8 @@ public final class MainActivity extends Activity {
         if (uploadButton == null || uploading || analyzing) {
             return;
         }
-        boolean ready = tree != null && stats != null && stats.files > 0
-                && validIp() != null && validPort() > 0 && validToken() != null;
+        boolean ready = tree != null && !packing && validIp() != null
+                && validPort() > 0 && validToken() != null;
         uploadButton.setEnabled(ready);
     }
 
@@ -471,6 +500,9 @@ public final class MainActivity extends Activity {
         scanButton.setEnabled(enabled);
         testButton.setEnabled(enabled);
         pickButton.setEnabled(enabled);
+        if (compressCheck != null) {
+            compressCheck.setEnabled(enabled);
+        }
         if (enabled) {
             refreshUploadButton();
         } else {
@@ -610,18 +642,18 @@ public final class MainActivity extends Activity {
     private void analyzeTree(Uri uri) {
         analyzing = true;
         tree = null;
-        stats = null;
+        packing = false;
+        deletePacked();
         dirInfo.setText("正在读取目录…");
         refreshUploadButton();
 
         final ContentResolver resolver = getContentResolver();
         background.execute(() -> {
             ExportTree resolved = null;
-            ExportTree.Stats counted = null;
             String error = null;
             try {
+                // 只解析目录（一次 query），不做全量文件统计：2 万+ 文件的遍历会明显拖慢「开始上传」
                 resolved = ExportTree.resolve(resolver, uri);
-                counted = ExportTree.count(resolver, resolved);
             } catch (ExportTree.TreeException e) {
                 error = e.getMessage();
             } catch (IOException e) {
@@ -631,47 +663,36 @@ public final class MainActivity extends Activity {
             }
 
             final ExportTree finalTree = resolved;
-            final ExportTree.Stats finalStats = counted;
             final String finalError = error;
             post(() -> {
                 analyzing = false;
-                if (finalTree == null || finalStats == null) {
+                if (finalTree == null) {
                     tree = null;
-                    stats = null;
                     dirInfo.setText("读取目录失败，请重新选择");
                     setStatus(finalError == null ? "读取目录失败，请重新选择。" : finalError,
                             StatusKind.ERROR);
                     prefs.edit().remove(PREF_TREE).apply();
                 } else {
-                    onTreeReady(uri, finalTree, finalStats);
+                    onTreeReady(uri, finalTree);
                 }
                 refreshUploadButton();
             });
         });
     }
 
-    private void onTreeReady(Uri uri, ExportTree resolved, ExportTree.Stats counted) {
+    private void onTreeReady(Uri uri, ExportTree resolved) {
         tree = resolved;
-        stats = counted;
+        deletePacked();
         prefs.edit().putString(PREF_TREE, uri.toString()).apply();
 
         StringBuilder builder = new StringBuilder();
-        builder.append("根目录：").append(resolved.rootName);
-        builder.append("\n共 ").append(counted.files).append(" 个文件 · ")
-                .append(formatBytes(counted.knownBytes));
-        if (counted.hasUnknownSize) {
-            builder.append("（部分文件大小未知）");
-        }
+        builder.append("已选择：").append(resolved.rootName);
         if (resolved.autoDrilled) {
             builder.append("\n已自动进入导出子目录");
         }
+        builder.append("\n点「开始上传」后先在手机上并行打包，再整包发送到电脑。");
         dirInfo.setText(builder.toString());
-
-        if (counted.files == 0) {
-            setStatus("所选目录里没有文件，请重新选择三星健康的导出目录。", StatusKind.ERROR);
-        } else {
-            setStatus("目录已就绪，可以开始上传。", StatusKind.OK);
-        }
+        setStatus("目录已就绪：开始上传时先多线程压缩，完成后再发送。", StatusKind.OK);
     }
 
     // =====================================================================
@@ -679,7 +700,7 @@ public final class MainActivity extends Activity {
     // =====================================================================
 
     private void startUpload() {
-        if (uploading || analyzing) {
+        if (uploading || packing || analyzing) {
             return;
         }
         String ip = validIp();
@@ -697,31 +718,120 @@ public final class MainActivity extends Activity {
             setStatus("请填写电脑端显示的 6 位数字令牌。", StatusKind.ERROR);
             return;
         }
-        if (tree == null || stats == null) {
+        if (tree == null) {
             setStatus("请先选择三星健康的导出目录。", StatusKind.ERROR);
             return;
         }
-        if (stats.files == 0) {
-            setStatus("所选目录里没有文件，请重新选择。", StatusKind.ERROR);
-            return;
-        }
-
         saveAddress(ip, port);
         hideKeyboard();
+        if (packed != null) {
+            // 上次打包完成但上传失败/取消：直接复用临时 ZIP 重试，不重新压缩
+            beginUpload(ip, port, token);
+        } else {
+            startPacking(ip, port, token);
+        }
+    }
+
+    /** 第一阶段：多线程打包到临时 ZIP（不阻塞，回调切回主线程）。 */
+    private void startPacking(String ip, int port, String token) {
+        cancelRequested = false;
+        packing = true;
+        setControlsEnabled(false);
+        uploadButton.setText("打包中…");
+        progressGroup.setVisibility(View.VISIBLE);
+        progressBar.setIndeterminate(true);
+        progressBar.setProgress(0);
+        progressText.setText("准备打包…");
+        cancelButton.setVisibility(View.VISIBLE);
+        cancelButton.setEnabled(true);
+        cancelButton.setText("取消");
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        setStatus("正在多线程打包，完成后会自动开始上传；请保持 App 在前台。", StatusKind.NORMAL);
+
+        final String host = ip;
+        final int httpPort = port;
+        final String uploadToken = token;
+        File temp = new File(getCacheDir(), "upload-" + System.currentTimeMillis() + ".zip");
+        final boolean compress = compressCheck == null || compressCheck.isChecked();
+        packer = new ZipPacker(getContentResolver(), tree, temp,
+                Runtime.getRuntime().availableProcessors(), compress, new ZipPacker.Listener() {
+            @Override
+            public void onProgress(long files, long sourceBytes, long zipBytes) {
+                post(() -> {
+                    if (packing) {
+                        progressText.setText("打包中 · " + files + " 个文件 · 已读 "
+                                + formatBytes(sourceBytes) + " → ZIP " + formatBytes(zipBytes));
+                    }
+                });
+            }
+
+            @Override
+            public void onDone(ZipPacker.Result result) {
+                post(() -> {
+                    packer = null;
+                    packing = false;
+                    packed = result;
+                    if (cancelRequested) {
+                        deletePacked();
+                        finishPacking();
+                        progressText.setText("已取消打包");
+                        return;
+                    }
+                    beginUpload(host, httpPort, uploadToken);
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                post(() -> {
+                    packer = null;
+                    packing = false;
+                    finishPacking();
+                    progressText.setText("打包失败");
+                    setStatus(message, StatusKind.ERROR);
+                });
+            }
+
+            @Override
+            public void onCancelled() {
+                post(() -> {
+                    packer = null;
+                    packing = false;
+                    finishPacking();
+                    progressText.setText("已取消打包");
+                    setStatus("已取消打包，没有上传。", StatusKind.WARN);
+                });
+            }
+        });
+        packer.start();
+    }
+
+    /** 第二阶段：把临时 ZIP 整包上传（固定长度 + SHA-256）。 */
+    private void beginUpload(String ip, int port, String token) {
+        if (packed == null || tree == null) {
+            finishPacking();
+            return;
+        }
+        cancelRequested = false;
+        uploadStartedAt = System.currentTimeMillis();
+        packing = false;
         uploading = true;
         setControlsEnabled(false);
         uploadButton.setText("上传中…");
         progressGroup.setVisibility(View.VISIBLE);
-        progressBar.setIndeterminate(stats.hasUnknownSize || stats.knownBytes <= 0);
+        progressBar.setIndeterminate(false);
         progressBar.setProgress(0);
-        progressText.setText("正在准备…");
+        progressText.setText("准备发送…");
         cancelButton.setVisibility(View.VISIBLE);
         cancelButton.setEnabled(true);
         cancelButton.setText("取消上传");
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        setStatus("正在打包并上传，请保持 App 在前台。", StatusKind.NORMAL);
+        setStatus("正在发送已打包的 ZIP（" + formatBytes(packed.zipBytes) + "），请保持 App 在前台。",
+                StatusKind.NORMAL);
 
-        uploader = new Uploader(getContentResolver(), tree, ip, port, token, stats.knownBytes,
+        final ZipPacker.Result result = packed;
+        final String fileName = Uploader.buildFileName(tree.rootName);
+        uploader = new Uploader(result.file, result.sha256, fileName, ip, port, token,
                 new Uploader.Listener() {
                     @Override
                     public void onProgress(long sentBytes, long totalBytes, long bytesPerSecond) {
@@ -732,16 +842,25 @@ public final class MainActivity extends Activity {
                     }
 
                     @Override
-                    public void onSuccess(String fileName, long bytes) {
+                    public void onSuccess(String name, long bytes) {
                         if (destroyed) {
                             return;
                         }
+                        long uploadMs = Math.max(1L, System.currentTimeMillis() - uploadStartedAt);
+                        String ratio = result.sourceBytes > 0 && result.zipBytes > 0
+                                ? String.format(Locale.US, "，压缩率 %.1fx",
+                                (double) result.sourceBytes / result.zipBytes)
+                                : "";
+                        String summary = "上传成功：" + name + "（ZIP " + formatBytes(bytes)
+                                + ratio + "，打包 " + formatMs(result.elapsedMs) + "，上传 "
+                                + formatMs(uploadMs) + "，平均 "
+                                + formatSpeed(bytes * 1000L / uploadMs) + "）";
+                        deletePacked();
                         finishUploading();
                         progressBar.setIndeterminate(false);
                         progressBar.setProgress(1000);
                         progressText.setText("上传完成 · " + formatBytes(bytes));
-                        setStatus("上传成功：" + fileName + "（" + formatBytes(bytes)
-                                + "）。电脑端正在解析，稍后可在电脑端查看。", StatusKind.OK);
+                        setStatus(summary + "。电脑端正在解析，稍后可在电脑端查看。", StatusKind.OK);
                     }
 
                     @Override
@@ -752,7 +871,8 @@ public final class MainActivity extends Activity {
                         finishUploading();
                         progressBar.setIndeterminate(false);
                         progressBar.setProgress(0);
-                        progressText.setText("上传失败");
+                        progressText.setText("上传失败（已保留打包文件，可直接重试）");
+                        uploadButton.setText("重试上传");
                         setStatus(message, StatusKind.ERROR);
                     }
 
@@ -764,20 +884,49 @@ public final class MainActivity extends Activity {
                         finishUploading();
                         progressBar.setIndeterminate(false);
                         progressBar.setProgress(0);
-                        progressText.setText("已取消上传");
+                        progressText.setText("已取消上传（已保留打包文件，可直接重试）");
+                        uploadButton.setText("重试上传");
                         setStatus("已取消上传，文件没有完整发送。", StatusKind.WARN);
                     }
                 });
         uploader.start();
     }
 
-    private void cancelUpload() {
-        if (uploader == null) {
-            return;
+    private void finishPacking() {
+        packing = false;
+        packer = null;
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        setControlsEnabled(true);
+        uploadButton.setText("开始上传");
+        cancelButton.setVisibility(View.GONE);
+        cancelButton.setEnabled(true);
+        cancelButton.setText("取消");
+    }
+
+    private void deletePacked() {
+        if (packed != null && packed.file != null) {
+            //noinspection ResultOfMethodCallIgnored
+            packed.file.delete();
         }
+        packed = null;
+    }
+
+    private void cancelUpload() {
+        cancelRequested = true;
         cancelButton.setEnabled(false);
         cancelButton.setText("取消中…");
-        uploader.cancel();
+        if (packing && packer != null) {
+            packer.cancel();
+            return;
+        }
+        if (uploader != null) {
+            uploader.cancel();
+            return;
+        }
+        if (packing) {
+            // 打包线程尚未就绪或已结束
+            finishPacking();
+        }
     }
 
     private void updateProgress(long sent, long total, long bytesPerSecond) {
@@ -867,6 +1016,13 @@ public final class MainActivity extends Activity {
         return formatBytes(bytesPerSecond) + "/s";
     }
 
+    private String formatMs(long ms) {
+        if (ms < 1000L) {
+            return ms + " ms";
+        }
+        return String.format(Locale.US, "%.1f s", ms / 1000.0);
+    }
+
     private void post(Runnable runnable) {
         ui.post(() -> {
             if (!destroyed) {
@@ -900,6 +1056,11 @@ public final class MainActivity extends Activity {
             uploader.cancel();
             uploader = null;
         }
+        if (packer != null) {
+            packer.cancel();
+            packer = null;
+        }
+        deletePacked();
         background.shutdownNow();
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         super.onDestroy();
@@ -907,14 +1068,18 @@ public final class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (uploading) {
+        if (uploading || packing) {
             new AlertDialog.Builder(this)
-                    .setMessage("正在上传，确定要取消并退出吗？")
-                    .setNegativeButton("继续上传", null)
-                    .setPositiveButton("取消上传并退出", (dialog, which) -> {
+                    .setMessage(uploading ? "正在上传，确定要取消并退出吗？" : "正在打包，确定要取消并退出吗？")
+                    .setNegativeButton("继续", null)
+                    .setPositiveButton("取消并退出", (dialog, which) -> {
                         if (uploader != null) {
                             uploader.cancel();
                         }
+                        if (packer != null) {
+                            packer.cancel();
+                        }
+                        deletePacked();
                         finish();
                     })
                     .show();

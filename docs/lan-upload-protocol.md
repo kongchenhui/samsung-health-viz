@@ -31,8 +31,9 @@ GET /health
 POST /upload
 X-Upload-Token: 123456            # 桌面端界面上显示的 6 位数字，每次启动重新生成
 X-File-Name: samsunghealth_%3C...%3E.zip   # encodeURIComponent(文件名)，可省略
+X-File-SHA256: <64 位十六进制>     # 可选：整包 SHA-256，电脑端校验用
 Content-Type: application/zip
-（可以是 chunked，不要求 Content-Length）
+Content-Length: <压缩后字节数>     # 推荐（App 先打包后上传，长度已知）；也兼容 chunked
 ```
 
 - 请求体就是完整 ZIP 文件（可 ZIP64）。ZIP 内**必须有一个顶层目录**（即导出根目录，例如
@@ -48,13 +49,18 @@ Content-Type: application/zip
 | `200 {"ok":true,"file":"<文件名>","bytes":123}` | 已接收，开始解析 |
 | `401 {"ok":false,"error":"bad-token"}` | 令牌不对 |
 | `400 {"ok":false,"error":"bad-file"}` | 内容不是 ZIP / 文件名为空 |
+| `400 {"ok":false,"error":"checksum-mismatch"}` | SHA-256 校验失败（传输损坏） |
+| `400 {"ok":false,"error":"size-mismatch"}` | 实际字节数与 Content-Length 不一致 |
 | `409 {"ok":false,"error":"busy"}` | 已有上传在进行 |
 | `413 {"ok":false,"error":"too-large"}` | 超过 2 GiB |
 | `429 {"ok":false,"error":"too-many-attempts"}` | 失败次数过多，稍后再试 |
 
 ## 4. 手机端行为约定
 
-- 选目录：`ACTION_OPEN_DOCUMENT_TREE`（SAF），持久化授权，遍历得到文件清单。
+- **两阶段**：先把导出目录并行压缩成本地临时 ZIP（多线程读文件 + deflate level 1），
+  再按固定长度整包上传；上传失败/取消时保留临时 ZIP，可直接重试（无需重新压缩）。
+- 临时 ZIP 放在 App 缓存目录，完成后删除；需要至少 128 MB 空闲空间。
+- 选目录：`ACTION_OPEN_DOCUMENT_TREE`（SAF），只解析根目录（不做全量扫描）；上传时再遍历。
 - 若选中的是「Samsung Health」父目录且里面只有一个 `samsunghealth_*` 子目录，自动进入该子目录。
 - ZIP 条目前缀 = 导出根目录名（与三星官方导出 ZIP 的结构一致，桌面端解析会剥掉这一层）。
 - 上传文件名：目录名匹配 `samsunghealth_<数字>_<14位时间戳>` 时原样加 `.zip`，

@@ -6,20 +6,14 @@ import android.net.Uri;
 import android.provider.DocumentsContract;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 /**
  * 通过 SAF（DocumentsContract + ContentResolver）访问用户选择的导出目录。
  *
  * <p>不依赖 AndroidX / DocumentFile：只用 {@link DocumentsContract} 构造子文档 URI，
- * 直接用 {@link ContentResolver#query} 与 {@link ContentResolver#openInputStream} 遍历。</p>
- *
- * <p>遍历只读取文档元数据和文件流，不落任何临时文件。</p>
+ * 直接用 {@link ContentResolver#query} 读目录元数据。真正的内容读取与打包在 {@link ZipPacker}。</p>
  */
 final class ExportTree {
 
@@ -30,25 +24,6 @@ final class ExportTree {
         }
     }
 
-    /** 用户取消上传时抛出，用于从深层遍历中快速退出。 */
-    static final class CancelledException extends IOException {
-        CancelledException() {
-            super("cancelled");
-        }
-    }
-
-    /** 打包进度回调：累计已处理的原始文件字节数。 */
-    interface StreamListener {
-        void onBytes(long bytes) throws IOException;
-    }
-
-    /** 遍历统计结果。 */
-    static final class Stats {
-        long files;
-        long knownBytes;
-        boolean hasUnknownSize;
-    }
-
     private static final String[] PROJECTION = {
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -56,8 +31,6 @@ final class ExportTree {
             DocumentsContract.Document.COLUMN_SIZE,
             DocumentsContract.Document.COLUMN_LAST_MODIFIED,
     };
-
-    private static final int MAX_DEPTH = 64;
 
     final Uri treeUri;
     final String rootDocId;
@@ -101,115 +74,8 @@ final class ExportTree {
         return new ExportTree(treeUri, treeDocId, rootName, false);
     }
 
-    /** 统计文件数量与总字节数（异步执行，供界面展示与进度百分比使用）。 */
-    static Stats count(ContentResolver resolver, ExportTree tree) throws IOException {
-        Stats stats = new Stats();
-        countDir(resolver, tree, tree.rootDocId, stats, 0);
-        return stats;
-    }
-
-    private static void countDir(ContentResolver resolver, ExportTree tree, String dirDocId,
-                                 Stats stats, int depth) throws IOException {
-        if (depth > MAX_DEPTH) {
-            return;
-        }
-        for (Child child : listChildren(resolver, tree.treeUri, dirDocId)) {
-            if (child.directory) {
-                countDir(resolver, tree, child.docId, stats, depth + 1);
-            } else {
-                stats.files++;
-                if (child.size >= 0) {
-                    stats.knownBytes += child.size;
-                } else {
-                    stats.hasUnknownSize = true;
-                }
-            }
-        }
-    }
-
-    /**
-     * 边遍历边写入 ZIP：第一个条目是导出根目录，其余条目路径为 {@code <root>/...}。
-     * 不创建临时 zip 文件。
-     */
-    static void streamToZip(ContentResolver resolver, ExportTree tree, ZipOutputStream zip,
-                            StreamListener listener) throws IOException {
-        putDirectoryEntry(zip, tree.rootName, 0L);
-        streamDir(resolver, tree, tree.rootDocId, tree.rootName, zip, listener, 0);
-    }
-
-    private static void streamDir(ContentResolver resolver, ExportTree tree, String dirDocId,
-                                  String pathPrefix, ZipOutputStream zip,
-                                  StreamListener listener, int depth) throws IOException {
-        if (depth > MAX_DEPTH) {
-            return;
-        }
-        for (Child child : listChildren(resolver, tree.treeUri, dirDocId)) {
-            String name = sanitizeName(child.name);
-            if (name == null) {
-                continue;
-            }
-            String path = pathPrefix + "/" + name;
-            if (child.directory) {
-                putDirectoryEntry(zip, path, child.lastModified);
-                streamDir(resolver, tree, child.docId, path, zip, listener, depth + 1);
-            } else {
-                ZipEntry entry = new ZipEntry(path);
-                if (child.lastModified > 0L) {
-                    entry.setTime(child.lastModified);
-                }
-                zip.putNextEntry(entry);
-                copyFile(resolver, tree.treeUri, child.docId, zip, listener);
-                zip.closeEntry();
-            }
-        }
-    }
-
-    private static void putDirectoryEntry(ZipOutputStream zip, String path, long time)
-            throws IOException {
-        ZipEntry entry = new ZipEntry(path + "/");
-        if (time > 0L) {
-            entry.setTime(time);
-        }
-        zip.putNextEntry(entry);
-        zip.closeEntry();
-    }
-
-    private static void copyFile(ContentResolver resolver, Uri treeUri, String docId,
-                                 OutputStream out, StreamListener listener) throws IOException {
-        Uri docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId);
-        InputStream in;
-        try {
-            in = resolver.openInputStream(docUri);
-        } catch (SecurityException e) {
-            throw new TreeException("没有读取所选目录的权限，请重新选择导出目录。");
-        } catch (IOException e) {
-            throw new TreeException("无法读取导出目录中的文件，请重新选择目录后重试。");
-        }
-        if (in == null) {
-            throw new TreeException("无法读取导出目录中的文件，请重新选择目录后重试。");
-        }
-
-        byte[] buffer = new byte[64 * 1024];
-        try (InputStream stream = in) {
-            while (true) {
-                int read;
-                try {
-                    read = stream.read(buffer);
-                } catch (SecurityException e) {
-                    throw new TreeException("没有读取所选目录的权限，请重新选择导出目录。");
-                } catch (IOException e) {
-                    throw new TreeException("读取导出目录失败，请检查文件是否仍可访问。");
-                }
-                if (read == -1) {
-                    break;
-                }
-                out.write(buffer, 0, read);
-                listener.onBytes(read);
-            }
-        }
-    }
-
-    private static List<Child> listChildren(ContentResolver resolver, Uri treeUri, String dirDocId)
+    /** 列出某个目录的子项（仅元数据，不读文件内容）。 */
+    static List<Child> listChildren(ContentResolver resolver, Uri treeUri, String dirDocId)
             throws IOException {
         Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, dirDocId);
         Cursor cursor;

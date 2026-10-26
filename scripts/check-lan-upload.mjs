@@ -3,6 +3,7 @@
 // 用法：node scripts/check-lan-upload.mjs
 // 说明：测试数据全部是虚构值（坐标、心率、时间均为随便编的），不包含任何真实用户数据。
 import http from 'node:http';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -264,6 +265,48 @@ try {
     assert.ok(!found.includes('/') && !found.includes('..'));
     assert.ok(found.endsWith('.zip'));
     fs.rmSync(path.join(UPLOADS, found), { force: true });
+  });
+
+  await test('固定长度 + SHA-256 上传成功', async () => {
+    const buf = zipBuf;
+    const sha = crypto.createHash('sha256').update(buf).digest('hex');
+    const res = await request(port, {
+      method: 'POST',
+      path: '/upload',
+      headers: {
+        'x-upload-token': TOKEN,
+        'x-file-name': 'checksum-ok.zip',
+        'x-file-sha256': sha,
+        'content-type': 'application/zip',
+      },
+      body: buf,
+      chunked: false, // 让 Node 自动带 Content-Length
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.json.ok, true);
+    assert.equal(res.json.bytes, buf.length);
+    assert.ok(res.json.ms >= 0);
+    assert.ok(fs.existsSync(path.join(UPLOADS, 'checksum-ok.zip')));
+    fs.rmSync(path.join(UPLOADS, 'checksum-ok.zip'), { force: true });
+  });
+
+  await test('SHA-256 不匹配返回 400 且不落盘', async () => {
+    const badSha = '0'.repeat(64);
+    const res = await request(port, {
+      method: 'POST',
+      path: '/upload',
+      headers: {
+        'x-upload-token': TOKEN,
+        'x-file-name': 'checksum-bad.zip',
+        'x-file-sha256': badSha,
+        'content-type': 'application/zip',
+      },
+      body: zipBuf,
+      chunked: false,
+    });
+    assert.equal(res.status, 400);
+    assert.equal(res.json.error, 'checksum-mismatch');
+    assert.ok(!fs.existsSync(path.join(UPLOADS, 'checksum-bad.zip')));
   });
 
   await test('非 ZIP 内容返回 400 且不落盘', async () => {

@@ -202,12 +202,24 @@ export function setupLanEvents() {
     } else if (ev.type === 'upload-saved') {
       lan.phase = 'parsing';
       lan.receivedBytes = Number(ev.bytes) || lan.receivedBytes;
+      lan.lastUpload = {
+        name: ev.name,
+        bytes: ev.bytes,
+        receiveMs: ev.receiveMs,
+        at: Date.now(),
+      };
       showProgress('解析手机上传的数据包…', 2);
     } else if (ev.type === 'parsing') {
       lan.phase = 'parsing';
     } else if (ev.type === 'parsed') {
       lan.phase = 'done';
-      lan.lastUpload = { name: ev.name, bytes: ev.bytes, at: Date.now() };
+      lan.lastUpload = {
+        name: ev.name,
+        bytes: ev.bytes,
+        receiveMs: ev.receiveMs,
+        parseMs: ev.data?.meta?.parseMs,
+        at: Date.now(),
+      };
       hideProgress();
       const data = ev.data;
       if (data) {
