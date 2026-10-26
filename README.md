@@ -108,7 +108,7 @@ pnpm dist:linux   # Linux：AppImage + deb（在 Linux 或 Docker/CI 上运行�
 
 **GitHub Actions**（`.github/workflows/build.yml`，已内置）：
 - 触发方式：手动触发，或推送 `v*` 版本 tag（推荐发布流程：`git tag v0.0.4 && git push origin v0.0.4`）；
-- 自动在 `macos-14` / `windows-latest` / `ubuntu-latest` 三个 runner 上分别打包；
+- 自动在 `macos-latest` / `windows-latest` / `ubuntu-latest` 三个 runner 上分别打包；
 - 产物以 artifact 形式上传（mac-arm64 / windows-x64 / linux-x64）；
 - `android` job 构建手机直传 App 的 debug APK（artifact 名 `android-apk`，可直接侧载安装）；
 - 最后一个 `release` job 会先校验 tag 与 `package.json` 的 `version` 一致，再把三平台安装包（dmg / pkg / zip / exe / AppImage / deb）与 Android APK 汇总并**自动创建并发布**对应的 GitHub Release；
