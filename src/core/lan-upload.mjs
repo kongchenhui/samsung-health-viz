@@ -195,10 +195,25 @@ export async function startLanReceiver(opts = {}) {
       return json(res, 409, { ok: false, error: 'busy' });
     }
 
+    // 固定长度上传：可以先拒掉明显超限的请求（chunked 时没有该头，边收边判）
+    const declaredLength = Number(req.headers['content-length']);
+    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+      req.resume();
+      emit({ type: 'upload-rejected', reason: 'too-large', ip, bytes: declaredLength });
+      return json(res, 413, { ok: false, error: 'too-large' });
+    }
+
+    const expectedSha = String(req.headers['x-file-sha256'] || '').trim().toLowerCase();
+    if (expectedSha && !/^[0-9a-f]{64}$/.test(expectedSha)) {
+      req.resume();
+      return json(res, 400, { ok: false, error: 'bad-checksum' });
+    }
+
     const fallback = `samsung-health-export-${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}.zip`;
     const name = sanitizeFileName(req.headers['x-file-name'], fallback);
     const finalPath = path.join(uploadDir, name);
     const partPath = `${finalPath}.part`;
+    const startedAt = Date.now();
 
     state.busy = true;
     emit({ type: 'upload-start', name, ip });
@@ -207,6 +222,7 @@ export async function startLanReceiver(opts = {}) {
     let tooLarge = false;
     let aborted = false;
     let lastEmit = 0;
+    const digest = crypto.createHash('sha256');
     const ws = fs.createWriteStream(partPath, { flags: 'w' });
 
     const cleanup = () => {
@@ -221,6 +237,7 @@ export async function startLanReceiver(opts = {}) {
           tooLarge = true;
           break;
         }
+        digest.update(chunk);
         if (!ws.write(chunk)) await new Promise((r) => ws.once('drain', r));
         const now = Date.now();
         if (now - lastEmit > 300) {
@@ -264,6 +281,21 @@ export async function startLanReceiver(opts = {}) {
       return json(res, 400, { ok: false, error: 'bad-file' });
     }
 
+    // 长度/SHA-256 校验（App 端固定长度上传时都会带；旧版 chunked 上传不带 SHA-256 时跳过）
+    if (Number.isFinite(declaredLength) && declaredLength >= 0 && declaredLength !== bytes) {
+      cleanup();
+      emit({ type: 'upload-rejected', reason: 'size-mismatch', ip, bytes });
+      return json(res, 400, { ok: false, error: 'size-mismatch' });
+    }
+    if (expectedSha) {
+      const actualSha = digest.digest('hex');
+      if (actualSha !== expectedSha) {
+        cleanup();
+        emit({ type: 'upload-rejected', reason: 'checksum-mismatch', ip, bytes });
+        return json(res, 400, { ok: false, error: 'checksum-mismatch' });
+      }
+    }
+
     try {
       fs.rmSync(finalPath, { force: true });
       fs.renameSync(partPath, finalPath);
@@ -273,10 +305,11 @@ export async function startLanReceiver(opts = {}) {
       return json(res, 500, { ok: false, error: 'save-failed' });
     }
 
+    const receiveMs = Date.now() - startedAt;
     state.busy = false;
-    state.lastUpload = { name, bytes, at: Date.now(), path: finalPath };
-    emit({ type: 'upload-saved', name, bytes, path: finalPath });
-    return json(res, 200, { ok: true, file: name, bytes });
+    state.lastUpload = { name, bytes, at: Date.now(), path: finalPath, receiveMs };
+    emit({ type: 'upload-saved', name, bytes, path: finalPath, receiveMs });
+    return json(res, 200, { ok: true, file: name, bytes, ms: receiveMs });
   }
 
   // 端口被占用时向后顺延，避免用户设备上常见的 8737 冲突

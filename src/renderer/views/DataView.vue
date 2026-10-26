@@ -45,6 +45,21 @@ const lanStateText = computed(() => {
   return '等待手机上传';
 });
 
+function fmtDuration(ms) {
+  if (!ms || ms <= 0) return '';
+  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+function receiveDetail(upload) {
+  if (!upload) return '';
+  const parts = [];
+  if (upload.bytes && upload.receiveMs) {
+    parts.push(`接收 ${fmtDuration(upload.receiveMs)} · ${(upload.bytes / (upload.receiveMs / 1000) / (1024 * 1024)).toFixed(1)} MB/s`);
+  }
+  if (upload.parseMs) parts.push(`解析 ${fmtDuration(upload.parseMs)}`);
+  return parts.join(' · ');
+}
+
 function fmtBytes(n) {
   if (!n) return '0 B';
   if (n < 1024) return `${n} B`;
@@ -130,7 +145,9 @@ onMounted(() => refreshLanStatus());
         </div>
 
         <div v-if="lan.phase === 'done' && lan.lastUpload" class="lan-result ok">
-          已导入 {{ lan.lastUpload.name || '手机上传的数据包' }}（{{ fmtBytes(lan.lastUpload.bytes) }}）
+          已导入 {{ lan.lastUpload.name || '手机上传的数据包' }}（{{ fmtBytes(lan.lastUpload.bytes) }}<template
+            v-if="receiveDetail(lan.lastUpload)"
+          > · {{ receiveDetail(lan.lastUpload) }}</template>）
         </div>
         <div v-else-if="lan.phase === 'error'" class="lan-result err">{{ lan.error }}</div>
 
@@ -156,7 +173,7 @@ onMounted(() => refreshLanStatus());
 
         <ol class="lan-steps">
           <li>手机与电脑连同一个 Wi-Fi；手机 App 会自动发现这台电脑，也可以用上面地址手动填。</li>
-          <li>在 App 里输入令牌，选择三星健康导出目录，点「打包并上传」。</li>
+          <li>在 App 里输入令牌，选择三星健康导出目录，点「开始上传」。</li>
           <li>保持本页打开即可看到接收进度，完成后自动解析并更新缓存。</li>
         </ol>
       </div>

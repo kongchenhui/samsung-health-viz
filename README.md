@@ -72,13 +72,13 @@ pnpm dist:linux   # Linux：AppImage + deb（在 Linux 或 Docker/CI 上运行�
 
 | 平台 | 产物 | 说明 |
 |---|---|---|
-| macOS arm64 | `SamsungHealthViz-0.0.3-arm64.dmg` | 拖拽安装（dmg target） |
-| macOS arm64 | `SamsungHealthViz-0.0.3-arm64.pkg` | 安装到 `/Applications`（pkg target） |
-| macOS arm64 | `SamsungHealthViz-0.0.3-arm64.zip` | 免安装（zip target） |
-| Windows x64 | `SamsungHealthViz-0.0.3-x64.exe` | NSIS 安装包（可选安装目录、创建快捷方式） |
-| Windows x64 | `SamsungHealthViz-0.0.3-x64.zip` | 便携版，解压后运行 `SamsungHealthViz.exe` |
+| macOS arm64 | `SamsungHealthViz-0.0.4-arm64.dmg` | 拖拽安装（dmg target） |
+| macOS arm64 | `SamsungHealthViz-0.0.4-arm64.pkg` | 安装到 `/Applications`（pkg target） |
+| macOS arm64 | `SamsungHealthViz-0.0.4-arm64.zip` | 免安装（zip target） |
+| Windows x64 | `SamsungHealthViz-0.0.4-x64.exe` | NSIS 安装包（可选安装目录、创建快捷方式） |
+| Windows x64 | `SamsungHealthViz-0.0.4-x64.zip` | 便携版，解压后运行 `SamsungHealthViz.exe` |
 | Linux x64 | `*.AppImage` / `*.deb` | AppImage 免安装 / deb 安装包 |
-| Android | `SamsungHealthViz-Bridge-0.0.3.apk` | 手机直传 App（debug 签名，侧载安装） |
+| Android | `SamsungHealthViz-Bridge-0.0.4.apk` | 手机直传 App（debug 签名，侧载安装） |
 
 说明：
 - 应用图标：macOS 用 `build/icon.icns`，Windows 用 `build/icon.ico`，Linux 用 `build/icon.png`；
@@ -107,12 +107,12 @@ pnpm dist:linux   # Linux：AppImage + deb（在 Linux 或 Docker/CI 上运行�
 本地机器缺工具链时（例如 Windows 安装包需要 wine / Rosetta，dmg 需要 macOS 的 hdiutil），交给 CI 或 Docker：
 
 **GitHub Actions**（`.github/workflows/build.yml`，已内置）：
-- 触发方式：手动触发，或推送 `v*` 版本 tag（推荐发布流程：`git tag v0.0.3 && git push origin v0.0.3`）；
+- 触发方式：手动触发，或推送 `v*` 版本 tag（推荐发布流程：`git tag v0.0.4 && git push origin v0.0.4`）；
 - 自动在 `macos-14` / `windows-latest` / `ubuntu-latest` 三个 runner 上分别打包；
 - 产物以 artifact 形式上传（mac-arm64 / windows-x64 / linux-x64）；
 - `android` job 构建手机直传 App 的 debug APK（artifact 名 `android-apk`，可直接侧载安装）；
 - 最后一个 `release` job 会先校验 tag 与 `package.json` 的 `version` 一致，再把三平台安装包（dmg / pkg / zip / exe / AppImage / deb）与 Android APK 汇总并**自动创建并发布**对应的 GitHub Release；
-- Release 说明自动读取仓库里的 `docs/release-notes/<tag>.md`（如 `docs/release-notes/v0.0.3.md`），文件不存在时回退为自动生成；
+- Release 说明自动读取仓库里的 `docs/release-notes/<tag>.md`（如 `docs/release-notes/v0.0.4.md`），文件不存在时回退为自动生成；
 - 发布统一走 tag 推送，不要在网页手动创建 Release（会和自动创建的 Release 冲突）。
 
 **Docker（在任意机器上构建 Windows 安装包）**：
@@ -143,7 +143,7 @@ docker run --rm --platform linux/amd64 -v "$PWD/release:/out" ridecareer-win
    cd android && ./gradlew assembleDebug   # 产物：android/app/build/outputs/apk/debug/app-debug.apk
    ```
    也可以在 GitHub Actions 手动运行 `Build installers` 工作流，下载 `android-apk` 附件；构建与安装细节见 [android/README.md](android/README.md)；
-3. 手机与电脑连同一个 Wi-Fi，App 会自动发现电脑（发现失败可手填地址）；输入令牌、选中三星健康导出目录，点「打包并上传」；
+3. 手机与电脑连同一个 Wi-Fi，App 会自动发现电脑（发现失败可手填地址）；输入令牌、选中三星健康导出目录，点「开始上传」：先在手机上多线程打包成临时 ZIP，再整包发送；
 4. 电脑端自动接收 → 解析 → 刷新缓存，手机端无需再做任何操作。
 
 ![手机直传](docs/screenshots/lan-transfer.png)
@@ -151,6 +151,9 @@ docker run --rm --platform linux/amd64 -v "$PWD/release:/out" ridecareer-win
 说明：
 
 - 手机 App 只把导出目录打包成 ZIP 上传，不接触、不上传三星账号凭据；桌面端只保留最近一份上传文件（界面里可清除）；
+- 上传带 `Content-Length` 与 `SHA-256`，电脑端会校验长度与校验和；手机端上传失败会保留临时 ZIP，可直接重试；
+- 手机端可切换是否压缩（默认压缩省流量；局域网很快时可关闭压缩，打包更快但 ZIP 更大）；
+- 临时 ZIP 在 App 缓存目录，成功后自动删除，需要至少 128 MB 空闲；
 - 接收器只在点击「开启接收」后运行，6 位令牌用于防止同网段误传；完整协议见 [docs/lan-upload-protocol.md](docs/lan-upload-protocol.md)；
 - 首次开启时 macOS / Windows 可能弹出防火墙授权；macOS 15+ 还会单独询问「本地网络」权限，都需要允许本应用访问局域网；
 - 上传体积与导出包一致（通常几百 MB），Wi-Fi 传输一般 1–3 分钟，App 内有进度与取消。

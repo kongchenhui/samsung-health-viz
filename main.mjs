@@ -100,13 +100,18 @@ function cleanupUploads(keep = 1) {
 }
 
 async function handleLanUpload(event) {
-  const { name, path: filePath, bytes } = event;
-  sendLanState({ type: 'parsing', name, bytes });
+  const { name, path: filePath, bytes, receiveMs } = event;
+  sendLanState({ type: 'parsing', name, bytes, receiveMs });
   try {
     const data = await parsePackage(filePath, win?.webContents);
     cleanupUploads(1);
-    console.log('[lan] 已解析手机上传的数据包', name, `${data.meta.ridesTotal} 条骑行`);
-    sendLanState({ type: 'parsed', name, bytes, data });
+    console.log(
+      '[lan] 已解析手机上传的数据包',
+      name,
+      `${data.meta.ridesTotal} 条骑行`,
+      `接收 ${receiveMs ?? '?'} ms / 解析 ${data.meta.parseMs} ms`
+    );
+    sendLanState({ type: 'parsed', name, bytes, receiveMs, data });
   } catch (e) {
     console.error('[lan] 解析手机上传的数据包失败', e);
     sendLanState({ type: 'parse-error', name, error: e.message || String(e) });

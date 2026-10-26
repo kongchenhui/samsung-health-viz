@@ -1,13 +1,13 @@
 package com.kongchenhui.samsunghealthviz.bridge;
 
-import android.content.ContentResolver;
 import android.os.Handler;
 import android.os.Looper;
 
 import org.json.JSONObject;
 
-import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -17,18 +17,17 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
-import java.util.zip.ZipOutputStream;
 
 /**
- * 把选中的导出目录边遍历边打包成 ZIP，并通过 HTTP POST 传给同一局域网内的电脑端。
+ * 第二阶段：把已经打包好的临时 ZIP 整包上传给电脑端。
  *
- * <p>使用 {@link HttpURLConnection} + chunked 流式上传，全程不落临时 zip 文件；
- * 所有网络操作都在工作线程执行，回调切回主线程。</p>
+ * <p>使用固定长度（Content-Length）+ 256 KB 缓冲顺序发送，并带上 SHA-256 供电脑端校验；
+ * 不再依赖 SAf 逐文件读取，因此网络阶段是纯 I/O。所有网络操作在工作线程执行，回调切回主线程。</p>
  */
 final class Uploader {
 
     interface Listener {
-        /** 已处理（打包）的原始字节数、总字节数（可能为 0 表示未知）、估算速度（字节/秒）。 */
+        /** 已发送字节数、总字节数（固定长度，恒 > 0）、估算速度（字节/秒）。 */
         void onProgress(long sentBytes, long totalBytes, long bytesPerSecond);
 
         void onSuccess(String fileName, long bytes);
@@ -40,15 +39,16 @@ final class Uploader {
 
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int READ_TIMEOUT_MS = 60_000;
-    private static final int BUFFER_SIZE = 64 * 1024;
+    private static final int BUFFER_SIZE = 256 * 1024;
     private static final long UI_INTERVAL_NS = 120L * 1000L * 1000L;
+    private static final long SPEED_WINDOW_NS = 300L * 1000L * 1000L;
 
-    private final ContentResolver resolver;
-    private final ExportTree tree;
+    private final File file;
+    private final String sha256;
+    private final String fileName;
     private final String host;
     private final int port;
     private final String token;
-    private final long totalBytes;
     private final Listener listener;
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -56,14 +56,14 @@ final class Uploader {
     private volatile HttpURLConnection connection;
     private Thread worker;
 
-    Uploader(ContentResolver resolver, ExportTree tree, String host, int port, String token,
-             long totalBytes, Listener listener) {
-        this.resolver = resolver;
-        this.tree = tree;
+    Uploader(File file, String sha256, String fileName, String host, int port, String token,
+             Listener listener) {
+        this.file = file;
+        this.sha256 = sha256;
+        this.fileName = fileName;
         this.host = host;
         this.port = port;
         this.token = token;
-        this.totalBytes = Math.max(0L, totalBytes);
         this.listener = listener;
     }
 
@@ -91,13 +91,8 @@ final class Uploader {
 
     private void run() {
         HttpURLConnection conn = null;
-        ZipOutputStream zip = null;
+        long total = Math.max(1L, file.length());
         try {
-            if (cancelRequested) {
-                postCancelled();
-                return;
-            }
-            String fileName = buildFileName(tree.rootName);
             URL url = new URL("http://" + hostForUrl(host) + ":" + port + "/upload");
             conn = (HttpURLConnection) url.openConnection();
             connection = conn;
@@ -106,31 +101,25 @@ final class Uploader {
             conn.setUseCaches(false);
             conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
             conn.setReadTimeout(READ_TIMEOUT_MS);
-            // chunked 流式上传：不预知 ZIP 大小，也不需要落临时文件
-            conn.setChunkedStreamingMode(BUFFER_SIZE);
+            // 已知 ZIP 大小：固定长度上传，进度更准确，电脑端也能校验长度
+            conn.setFixedLengthStreamingMode(total);
             conn.setRequestProperty("Content-Type", "application/zip");
             conn.setRequestProperty("X-Upload-Token", token);
             conn.setRequestProperty("X-File-Name", encodeURIComponent(fileName));
-            conn.setRequestProperty("User-Agent", "SamsungHealthVizBridge/1.0 (Android)");
+            if (sha256 != null && !sha256.isEmpty()) {
+                conn.setRequestProperty("X-File-SHA256", sha256);
+            }
+            conn.setRequestProperty("User-Agent", "SamsungHealthVizBridge/1.1 (Android)");
 
-            final long total = totalBytes;
+            SpeedMeter meter = new SpeedMeter();
             postProgress(0L, total, 0L);
-
-            ProgressSink sink = new ProgressSink();
-            OutputStream rawOutput = conn.getOutputStream();
-            zip = new ZipOutputStream(new BufferedOutputStream(rawOutput, BUFFER_SIZE),
-                    StandardCharsets.UTF_8);
-            ExportTree.streamToZip(resolver, tree, zip, sink);
-            zip.finish();
-            zip.flush();
-            zip.close();
-            zip = null;
+            long sent = sendFile(conn, total, meter);
 
             if (cancelRequested) {
                 postCancelled();
                 return;
             }
-            postProgress(sink.sent, total, sink.speed());
+            postProgress(sent, total, meter.speed());
 
             int code = conn.getResponseCode();
             String body = readBody(code >= 400 ? conn.getErrorStream() : conn.getInputStream());
@@ -141,7 +130,7 @@ final class Uploader {
             }
             if (code == 200) {
                 String savedName = fileName;
-                long savedBytes = sink.sent;
+                long savedBytes = sent;
                 try {
                     JSONObject json = new JSONObject(body);
                     if (json.optBoolean("ok", false)) {
@@ -162,13 +151,6 @@ final class Uploader {
 
             final String message = messageForCode(code);
             main.post(() -> listener.onFailure(message));
-        } catch (ExportTree.CancelledException e) {
-            postCancelled();
-        } catch (ExportTree.TreeException e) {
-            final String message = e.getMessage() == null
-                    ? "读取导出目录失败，请重新选择后重试。"
-                    : e.getMessage();
-            main.post(() -> listener.onFailure(message));
         } catch (IOException e) {
             if (cancelRequested) {
                 postCancelled();
@@ -187,13 +169,6 @@ final class Uploader {
             main.post(() -> listener.onFailure(message));
         } finally {
             connection = null;
-            if (zip != null) {
-                try {
-                    zip.close();
-                } catch (Exception ignored) {
-                    // 忽略
-                }
-            }
             if (conn != null) {
                 try {
                     conn.disconnect();
@@ -202,6 +177,32 @@ final class Uploader {
                 }
             }
         }
+    }
+
+    /** 把临时 ZIP 顺序写入请求体，返回已发送字节数。 */
+    private long sendFile(HttpURLConnection conn, long total, SpeedMeter meter) throws IOException {
+        long sent = 0L;
+        long lastUi = 0L;
+        try (InputStream in = new FileInputStream(file);
+             OutputStream out = conn.getOutputStream()) {
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                if (cancelRequested) {
+                    throw new IOException("cancelled");
+                }
+                out.write(buffer, 0, read);
+                sent += read;
+                meter.add(read);
+                long now = System.nanoTime();
+                if (now - lastUi >= UI_INTERVAL_NS) {
+                    lastUi = now;
+                    postProgress(sent, total, meter.speed());
+                }
+            }
+            out.flush();
+        }
+        return sent;
     }
 
     private void postProgress(final long sent, final long total, final long bps) {
@@ -221,7 +222,7 @@ final class Uploader {
     static String messageForCode(int code) {
         switch (code) {
             case 400:
-                return "电脑端没有识别出有效的 ZIP 文件。请确认选择的是三星健康导出的目录后重试。";
+                return "电脑端没有识别出有效的 ZIP 文件（或校验失败）。请重试或重新打包。";
             case 401:
                 return "令牌不正确。请检查电脑端界面上显示的 6 位令牌后重试。";
             case 409:
@@ -354,45 +355,30 @@ final class Uploader {
         }
     }
 
-    /** 统计打包进度并节流回调，顺便检查取消。 */
-    private final class ProgressSink implements ExportTree.StreamListener {
-        private long sent;
-        private long lastUiNs;
-        private long speedMarkNs = System.nanoTime();
-        private long speedMarkBytes;
+    /** 发送速率统计：300 ms 窗口，带平滑。 */
+    private static final class SpeedMeter {
+        private long markNs = System.nanoTime();
+        private long markBytes;
         private long speed;
 
-        long sent() {
-            return sent;
+        void add(long bytes) {
+            long now = System.nanoTime();
+            long delta = now - markNs;
+            if (delta >= SPEED_WINDOW_NS) {
+                long instant = (markBytes + bytes) * 1_000_000_000L / Math.max(1L, delta);
+                speed = speed == 0L ? instant : (speed * 3L + instant) / 4L;
+                markNs = now;
+                markBytes = 0L;
+            } else {
+                markBytes += bytes;
+            }
         }
 
         long speed() {
-            return speed;
-        }
-
-        @Override
-        public void onBytes(long bytes) throws IOException {
-            sent += bytes;
-            if (cancelRequested) {
-                throw new ExportTree.CancelledException();
+            if (speed > 0L) {
+                return speed;
             }
-            long now = System.nanoTime();
-            if (now - lastUiNs >= UI_INTERVAL_NS) {
-                lastUiNs = now;
-                updateSpeed(now);
-                postProgress(sent, totalBytes, speed);
-            }
-        }
-
-        private void updateSpeed(long now) {
-            long deltaNs = now - speedMarkNs;
-            if (deltaNs >= 300_000_000L) {
-                long deltaBytes = sent - speedMarkBytes;
-                long instant = deltaBytes * 1_000_000_000L / deltaNs;
-                speed = speed == 0L ? instant : (speed * 3L + instant) / 4L;
-                speedMarkNs = now;
-                speedMarkBytes = sent;
-            }
+            return 0L;
         }
     }
 }
