@@ -16,6 +16,20 @@ contextBridge.exposeInMainWorld('api', {
   },
   onMenuPickZip: (cb) => ipcRenderer.on('menu:pickZip', cb),
   onMenuPickFolder: (cb) => ipcRenderer.on('menu:pickFolder', cb),
+  // 局域网直传（手机 App → 电脑）
+  lanStart: () => ipcRenderer.invoke('lan:start'),
+  lanStop: () => ipcRenderer.invoke('lan:stop'),
+  lanStatus: () => ipcRenderer.invoke('lan:status'),
+  lanToken: () => ipcRenderer.invoke('lan:token'),
+  lanReveal: () => ipcRenderer.invoke('lan:reveal'),
+  lanClear: () => ipcRenderer.invoke('lan:clear'),
+  onLanState: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('lan:state', handler);
+    return () => ipcRenderer.removeListener('lan:state', handler);
+  },
+  copyText: (text) => ipcRenderer.invoke('app:copy', text),
+  openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
   getPathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file);
