@@ -1,6 +1,6 @@
 {
   "name": "samsung-health-viz",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Samsung Health data visualizer — cycling as the first module",
   "main": "main.mjs",
@@ -9,6 +9,9 @@
     "dev": "node scripts/dev.mjs",
     "build": "vite build",
     "start": "electron .",
+    "check": "pnpm check:coord && pnpm check:lan",
+    "check:coord": "node scripts/check-coord-sys.mjs",
+    "check:lan": "node scripts/check-lan-upload.mjs",
     "dist:mac": "vite build && electron-builder --mac --arm64 --publish never",
     "dist:win": "vite build && electron-builder --win --x64 --publish never",
     "dist:linux": "vite build && electron-builder --linux --x64 --publish never"

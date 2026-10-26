@@ -3,3 +3,10 @@ dist
 release
 .cache
 .DS_Store
+.pnpm-store
+.toolchain
+android/.gradle
+android/build
+android/app/build
+android/local.properties
+android/.idea

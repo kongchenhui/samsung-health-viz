@@ -1,10 +1,11 @@
-// Electron 主进程：窗口、数据包解析（ZIP / 解压目录）、缓存、截图调试
-import { app, BrowserWindow, Menu, dialog, ipcMain, shell } from 'electron';
+// Electron 主进程：窗口、数据包解析（ZIP / 解压目录）、缓存、局域网直传、截图调试
+import { app, BrowserWindow, Menu, dialog, ipcMain, shell, clipboard } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { folderReader, zipReader, buildCyclingDataset, resolvePackageDir, SCHEMA } from './src/core/parse.mjs';
+import { startLanReceiver } from './src/core/lan-upload.mjs';
 
 // electron-updater 是 CJS 包，主进程是 ESM，用 createRequire 引入最稳
 const require = createRequire(import.meta.url);
@@ -21,6 +22,7 @@ function argValue(name) {
 const shotPath = argValue('shot');
 const shotDelay = Number(argValue('shot-delay') || 6000);
 const shotPage = argValue('shot-page');
+const shotJs = argValue('shot-js'); // 截图前执行一段渲染进程 JS（调试/验证用）
 
 let win = null;
 
@@ -70,6 +72,72 @@ async function parsePackage(target, sender) {
   writeCache(data);
   send('完成', 100);
   return data;
+}
+
+/* ---------- 手机 → 电脑 局域网直传 ---------- */
+// 协议见 docs/lan-upload-protocol.md：HTTP 上传 + UDP 广播发现，手机端把导出目录打包成 ZIP 直传。
+let lan = null; // { receiver, dir }
+let lanParseChain = Promise.resolve();
+const lanUploadDir = () => path.join(app.getPath('userData'), 'uploads');
+
+function sendLanState(payload) {
+  try {
+    win?.webContents.send('lan:state', payload);
+  } catch { /* 窗口已关闭 */ }
+}
+
+/** 只保留最近 N 份上传的 ZIP，避免 userData 无限增长 */
+function cleanupUploads(keep = 1) {
+  const dir = lanUploadDir();
+  try {
+    const files = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith('.zip'))
+      .map((f) => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t);
+    for (const { f } of files.slice(keep)) fs.rmSync(path.join(dir, f), { force: true });
+  } catch { /* 目录不存在等，忽略 */ }
+}
+
+async function handleLanUpload(event) {
+  const { name, path: filePath, bytes } = event;
+  sendLanState({ type: 'parsing', name, bytes });
+  try {
+    const data = await parsePackage(filePath, win?.webContents);
+    cleanupUploads(1);
+    console.log('[lan] 已解析手机上传的数据包', name, `${data.meta.ridesTotal} 条骑行`);
+    sendLanState({ type: 'parsed', name, bytes, data });
+  } catch (e) {
+    console.error('[lan] 解析手机上传的数据包失败', e);
+    sendLanState({ type: 'parse-error', name, error: e.message || String(e) });
+  }
+}
+
+let lanStarting = null;
+async function ensureLan() {
+  if (lan?.receiver?.info().running) return { ok: true, ...lan.receiver.info() };
+  // 连点「开启接收」时复用同一个启动流程，避免起两个接收器抢端口
+  if (lanStarting) return lanStarting;
+  lanStarting = (async () => {
+    const dir = lanUploadDir();
+    const receiver = await startLanReceiver({
+      uploadDir: dir,
+      onEvent: (ev) => {
+        if (ev.type === 'upload-saved') {
+          // 同一时间只解析一个包，串行排队，避免并发写缓存
+          lanParseChain = lanParseChain.then(() => handleLanUpload(ev)).catch(() => {});
+          return;
+        }
+        sendLanState(ev);
+      },
+    });
+    lan = { receiver, dir };
+    cleanupUploads(1);
+    return { ok: true, ...receiver.info() };
+  })().finally(() => {
+    lanStarting = null;
+  });
+  return lanStarting;
 }
 
 /* ---------- 窗口 ---------- */
@@ -134,6 +202,15 @@ function createWindow() {
               `location.hash = ${JSON.stringify(shotPage)}; window.dispatchEvent(new HashChangeEvent('hashchange'));`
             );
             await new Promise((r) => setTimeout(r, 2500));
+          }
+          if (shotJs) {
+            try {
+              const r = await win.webContents.executeJavaScript(shotJs);
+              console.log('[shot-js]', JSON.stringify(r));
+            } catch (e) {
+              console.error('[shot-js] failed', e);
+            }
+            await new Promise((r) => setTimeout(r, 900));
           }
           const img = await win.webContents.capturePage();
           fs.writeFileSync(shotPath, img.toPNG());
@@ -228,6 +305,60 @@ function registerIpc() {
     } catch (e) {
       return { ok: false, error: e.message || String(e) };
     }
+  });
+
+  // ---- 局域网直传（手机 App → 电脑） ----
+  ipcMain.handle('lan:start', async () => {
+    try {
+      return await ensureLan();
+    } catch (e) {
+      console.error('[lan] 启动失败', e);
+      return { ok: false, error: e.message || String(e) };
+    }
+  });
+
+  ipcMain.handle('lan:stop', async () => {
+    try {
+      const prev = lan;
+      lan = null;
+      await prev?.receiver.stop();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e.message || String(e) };
+    }
+  });
+
+  ipcMain.handle('lan:status', () => {
+    if (!lan) return { ok: true, running: false, uploadDir: lanUploadDir() };
+    return { ok: true, ...lan.receiver.info() };
+  });
+
+  ipcMain.handle('lan:token', () => {
+    if (!lan) return { ok: false, error: '接收器未启动' };
+    return { ok: true, token: lan.receiver.regenerateToken() };
+  });
+
+  ipcMain.handle('lan:reveal', () => {
+    const dir = lanUploadDir();
+    fs.mkdirSync(dir, { recursive: true });
+    shell.openPath(dir);
+  });
+
+  ipcMain.handle('lan:clear', () => {
+    cleanupUploads(0);
+    sendLanState({ type: 'cleared' });
+    return { ok: true };
+  });
+
+  // 渲染进程不能直接用 Electron API，复制到剪贴板走主进程
+  ipcMain.handle('app:copy', (_e, text) => {
+    clipboard.writeText(String(text ?? ''));
+    return true;
+  });
+
+  ipcMain.handle('app:openExternal', (_e, url) => {
+    const target = String(url || '');
+    if (/^https?:\/\//i.test(target)) shell.openExternal(target);
   });
 }
 
@@ -375,6 +506,12 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
   setupAutoUpdate();
+  // 调试/联调：--lan-auto 启动时直接开启接收器（不开界面也能收手机上传）
+  if (argValue('lan-auto')) {
+    ensureLan()
+      .then((info) => console.log('[lan-auto] listening', JSON.stringify({ port: info.port, token: info.token, urls: info.urls })))
+      .catch((e) => console.error('[lan-auto] failed', e));
+  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -382,4 +519,11 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (!isMac) app.quit();
+});
+
+// 退出时关掉接收器（UDP 广播与 HTTP 端口都要释放）
+app.on('before-quit', () => {
+  const prev = lan;
+  lan = null;
+  prev?.receiver.stop().catch(() => {});
 });

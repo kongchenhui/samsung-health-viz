@@ -67,7 +67,7 @@ const exportLabel = computed(() => store.dataset?.meta?.exportTime?.slice(0, 10)
         数据包 · 账号 {{ packageLabel }}
         <em v-if="exportLabel">{{ exportLabel }} 导出</em>
       </span>
-      <button v-if="store.dataset" class="btn ghost small" @click="router.push('/data')">数据包</button>
+      <button class="btn ghost small" @click="router.push('/data')">数据包</button>
     </div>
   </header>
 </template>

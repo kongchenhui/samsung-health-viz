@@ -1,5 +1,8 @@
 <script setup>
+import { useRouter } from 'vue-router';
 import { pickZip, pickFolder } from '../store.js';
+
+const router = useRouter();
 </script>
 
 <template>
@@ -32,7 +35,12 @@ import { pickZip, pickFolder } from '../store.js';
       <div class="welcome-actions">
         <button class="btn primary" @click="pickZip()">选择 ZIP 数据包</button>
         <button class="btn ghost" @click="pickFolder()">选择解压文件夹</button>
+        <button class="btn ghost" @click="router.push('/data')">手机直传（局域网）→</button>
       </div>
+
+      <p class="welcome-lan-hint">
+        不想插数据线？在「数据」页开启接收，手机装仓库里的直传 App 选中导出目录即可一键打包上传。
+      </p>
 
       <ol class="steps">
         <li>手机三星健康 App → 设置 → 下载个人数据，得到 <code>samsunghealth_&lt;手机号&gt;_&lt;时间&gt;.zip</code></li>

@@ -1348,3 +1348,117 @@ body.platform-linux .titlebar {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------- 手机直传（数据页） ---------- */
+.lan-card .lan-desc {
+  margin: 0 0 14px;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.lan-off {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.lan-hint {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.lan-hint code {
+  margin-left: 6px;
+  color: var(--text-2);
+}
+.lan-error {
+  color: var(--red);
+  font-size: 12.5px;
+}
+.lan-on {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lan-grid {
+  margin-bottom: 0;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.lan-token {
+  letter-spacing: 0.16em;
+  font-size: 18px !important;
+  color: var(--accent);
+}
+.lan-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lan-progress {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--line-soft);
+}
+.lan-progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.lan-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  position: relative;
+}
+.lan-bar i {
+  display: block;
+  height: 100%;
+  width: 36%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 176, 46, 0.2), var(--accent));
+  animation: lan-slide 1.15s ease-in-out infinite;
+}
+.lan-bar i.parsing {
+  animation-duration: 0.8s;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.2), var(--blue));
+}
+@keyframes lan-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+.lan-result {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  border: 1px solid var(--line-soft);
+  color: var(--text-2);
+}
+.lan-result.ok {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+  color: #a7f3c3;
+}
+.lan-result.err {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+  color: #fecaca;
+}
+.lan-steps {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.85;
+}
