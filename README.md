@@ -17,7 +17,7 @@
 | 渲染 | Vue 3（SFC + `<script setup>`）+ vue-router（hash 模式） |
 | 构建 | Vite 8 + `@vitejs/plugin-vue` |
 | 图表 | ECharts 6 + vue-echarts（折线、柱状、日历热力） |
-| 地图 | Leaflet 1.9（高德暗色/标准/卫星、Esri 卫星、OSM、离线无底图；轨迹描边 + 底图淡化） |
+| 地图 | Leaflet 1.9（高德暗色/标准/卫星、Stadia 全系 9 款、Esri 卫星、OSM、离线无底图；轨迹描边 + 底图淡化 + 全屏） |
 | 数据 | `adm-zip` 直接读取用户选择的 ZIP；CSV 自行解析（三星导出格式：两行文件头 + 行尾空字段） |
 | 手机直传 | Android App（纯 Java、无第三方依赖）：选目录 → 打包 ZIP → 局域网 HTTP 上传；桌面端内置接收器（HTTP + UDP 广播发现，`src/core/lan-upload.mjs`） |
 
@@ -38,9 +38,40 @@ pnpm start          # 以构建产物启动 Electron
 生涯页/详情页右上角可切换底图，并在「底图淡化」滑杆调节底图强度（轨迹会带深色描边，任何底图下都能看清）：
 
 - **高德 · 暗色（默认）**：压暗后的高德矢量图 + 中文地名，彩色轨迹最醒目；
-- 高德 · 标准 / 高德 · 卫星（中文标注）/ Esri 卫星；
+- **Stadia Maps 全家桶**（均需 API Key，配置见下一节）：
+  - `Stadia · Alidade Smooth / Alidade Smooth Dark`：素雅、标签与 POI 少，最适合叠大量彩色轨迹；
+  - `Stadia · Alidade Bright`：全彩 Alidade，水体/林地/农田/公园分色，风格明快；
+  - `Stadia · Alidade Satellite`：卫星影像 + 标注（**需要 Stadia Standard 及以上套餐**，免费 Key 会 403）；
+  - `Stadia · Outdoors`：户外风格，步道/等高线更完整；
+  - `Stadia · Stamen Toner / Stamen Terrain / Stamen Watercolor`：Stamen 经典艺术风格
+    （Toner 黑白高对比、Terrain 地形、Watercolor 水彩；Watercolor 官方放大上限 16 级）；
+  - `Stadia · OSM Bright`：经典 OSM Bright 样式；
+- 高德 · 标准 / 高德 · 卫星 / Esri 卫星；
 - OpenStreetMap（WGS-84 参考底图，可用来核对轨迹是否贴合道路）；
 - 无底图（离线，纯轨迹 + 深色网格）。
+
+地图右上角还有「全屏」按钮：把地图卡片铺满内容区（保留顶部标题栏与导航，窗口按钮不受影响），
+底图/淡化/年份与区域筛选在全屏下照常可用，按 `Esc` 或再点一次按钮退出。
+
+底图主题、「底图淡化」和 Stadia API Key 都会保存在本机配置文件 `<userData>/settings.json`
+（macOS 为 `~/Library/Application Support/Samsung Health Viz/settings.json`），下次启动自动恢复；
+`?map=` / `?dim=` 调试参数只对本次启动生效，不会覆盖已保存的偏好。
+
+### Stadia 底图与 API Key
+
+Stadia 的 9 款底图都需要 API Key（桌面端 `file://` 不走 localhost 免鉴权）。两种配置方式：
+
+1. **应用内填写（推荐）**：打开「数据」页 →「地图底图（Stadia Maps）」→「填写 Key」；
+   或第一次在下拉框选到 Stadia 底图时，按弹窗提示粘贴。Key 保存在本机配置文件
+   `<userData>/settings.json`（与底图主题、淡化同一个文件），不会写进仓库或安装包。
+2. **构建时注入**：在项目根目录建 `.env.local`（已加入 `.gitignore`），写入
+   `VITE_STADIA_API_KEY=<你的 Key>` 后重新 `pnpm build`。适合只自己用的本地构建；
+   对外分发不要把个人 Key 打进安装包。
+
+免费账号即可覆盖除 Alidade Satellite 外的样式（有额度限制）：<https://client.stadiamaps.com/dashboard/>。
+瓦片域名 `tiles.stadiamaps.com` 在国内直连可能不稳定，需要代理时请确认系统代理已开启（Electron 跟随系统代理）。
+版权：Stadia Maps / OpenMapTiles / OpenStreetMap，Stamen 系列另需署名 Stamen Design，Alidade Satellite
+另含 CNES / Airbus DS / PlanetObserver 影像版权（地图右下角已按各样式要求展示）。
 
 > 坐标说明（混合坐标系，按数据本身的来源自动判定）：
 > - 三星健康导出里**没有**显式的“坐标基准”字段，但轨迹 JSON 会暴露来源格式：
@@ -72,13 +103,13 @@ pnpm dist:linux   # Linux：AppImage + deb（在 Linux 或 Docker/CI 上运行�
 
 | 平台 | 产物 | 说明 |
 |---|---|---|
-| macOS arm64 | `SamsungHealthViz-0.0.4-arm64.dmg` | 拖拽安装（dmg target） |
-| macOS arm64 | `SamsungHealthViz-0.0.4-arm64.pkg` | 安装到 `/Applications`（pkg target） |
-| macOS arm64 | `SamsungHealthViz-0.0.4-arm64.zip` | 免安装（zip target） |
-| Windows x64 | `SamsungHealthViz-0.0.4-x64.exe` | NSIS 安装包（可选安装目录、创建快捷方式） |
-| Windows x64 | `SamsungHealthViz-0.0.4-x64.zip` | 便携版，解压后运行 `SamsungHealthViz.exe` |
+| macOS arm64 | `SamsungHealthViz-0.0.5-arm64.dmg` | 拖拽安装（dmg target） |
+| macOS arm64 | `SamsungHealthViz-0.0.5-arm64.pkg` | 安装到 `/Applications`（pkg target） |
+| macOS arm64 | `SamsungHealthViz-0.0.5-arm64.zip` | 免安装（zip target） |
+| Windows x64 | `SamsungHealthViz-0.0.5-x64.exe` | NSIS 安装包（可选安装目录、创建快捷方式） |
+| Windows x64 | `SamsungHealthViz-0.0.5-x64.zip` | 便携版，解压后运行 `SamsungHealthViz.exe` |
 | Linux x64 | `*.AppImage` / `*.deb` | AppImage 免安装 / deb 安装包 |
-| Android | `SamsungHealthViz-Bridge-0.0.4.apk` | 手机直传 App（debug 签名，侧载安装） |
+| Android | `SamsungHealthViz-Bridge-0.0.5.apk` | 手机直传 App（debug 签名，侧载安装） |
 
 说明：
 - 应用图标：macOS 用 `build/icon.icns`，Windows 用 `build/icon.ico`，Linux 用 `build/icon.png`；
@@ -107,12 +138,12 @@ pnpm dist:linux   # Linux：AppImage + deb（在 Linux 或 Docker/CI 上运行�
 本地机器缺工具链时（例如 Windows 安装包需要 wine / Rosetta，dmg 需要 macOS 的 hdiutil），交给 CI 或 Docker：
 
 **GitHub Actions**（`.github/workflows/build.yml`，已内置）：
-- 触发方式：手动触发，或推送 `v*` 版本 tag（推荐发布流程：`git tag v0.0.4 && git push origin v0.0.4`）；
+- 触发方式：手动触发，或推送 `v*` 版本 tag（推荐发布流程：`git tag v0.0.5 && git push origin v0.0.5`）；
 - 自动在 `macos-latest` / `windows-latest` / `ubuntu-latest` 三个 runner 上分别打包；
 - 产物以 artifact 形式上传（mac-arm64 / windows-x64 / linux-x64）；
 - `android` job 构建手机直传 App 的 debug APK（artifact 名 `android-apk`，可直接侧载安装）；
 - 最后一个 `release` job 会先校验 tag 与 `package.json` 的 `version` 一致，再把三平台安装包（dmg / pkg / zip / exe / AppImage / deb）与 Android APK 汇总并**自动创建并发布**对应的 GitHub Release；
-- Release 说明自动读取仓库里的 `docs/release-notes/<tag>.md`（如 `docs/release-notes/v0.0.4.md`），文件不存在时回退为自动生成；
+- Release 说明自动读取仓库里的 `docs/release-notes/<tag>.md`（如 `docs/release-notes/v0.0.5.md`），文件不存在时回退为自动生成；
 - 发布统一走 tag 推送，不要在网页手动创建 Release（会和自动创建的 Release 冲突）。
 
 **Docker（在任意机器上构建 Windows 安装包）**：
@@ -203,7 +234,7 @@ samsung-health-viz/
 ## 首期范围与后续
 
 已完成：数据包导入与缓存、生涯总览（KPI / 年度统计 / 个人最佳 / 骑行日历 / 全部路线地图 + 城市聚类筛选）、
-骑行记录列表与筛选、单次骑行详情（轨迹速度着色、图表、分段配速）、地图底图切换、
+骑行记录列表与筛选、单次骑行详情（轨迹速度着色、图表、分段配速）、地图底图切换（含 Stadia 全系底图）与全屏查看、
 macOS 打包（zip / pkg 安装包，含应用图标与 ad-hoc 签名）、手机 → 电脑局域网直传（Android App）。
 
 后续可扩展：步数/活动、睡眠、心率与压力等模块；路线热力图与路线热区；数据导出（GPX）；Windows/Linux 构建与签名公证。

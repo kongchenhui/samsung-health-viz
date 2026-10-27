@@ -15,6 +15,47 @@ const AMAP_OPTS = { subdomains: '1234', maxZoom: 18, attribution: '© 高德地�
 const ARCGIS = 'https://server.arcgisonline.com/ArcGIS/rest/services';
 const SATELLITE = `${ARCGIS}/World_Imagery/MapServer/tile/{z}/{y}/{x}`;
 
+// Stadia Maps 栅格底图：桌面端（file://）不走域名鉴权，必须带 API Key（查询参数 api_key）。
+// 样式清单 / 放大上限 / 版权要求见 https://docs.stadiamaps.com/themes/
+const STADIA_TILES = 'https://tiles.stadiamaps.com/tiles';
+const STADIA_ATTR =
+  '&copy; <a href="https://stadiamaps.com/attribution/" target="_blank">Stadia Maps</a> ' +
+  '&copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> ' +
+  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
+// Stamen 系列额外要求署名 Stamen Design
+const STADIA_ATTR_STAMEN =
+  '&copy; <a href="https://stadiamaps.com/attribution/" target="_blank">Stadia Maps</a> ' +
+  '&copy; <a href="https://stamen.com/" target="_blank">Stamen Design</a> ' +
+  '&copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> ' +
+  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
+// Watercolor 基于 OSM 底图，不含 OpenMapTiles
+const STADIA_ATTR_WATERCOLOR =
+  '&copy; <a href="https://stadiamaps.com/attribution/" target="_blank">Stadia Maps</a> ' +
+  '&copy; <a href="https://stamen.com/" target="_blank">Stamen Design</a> ' +
+  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
+// Alidade Satellite 的影像版权方
+const STADIA_ATTR_SATELLITE =
+  '&copy; CNES, Distribution Airbus DS, &copy; Airbus DS, &copy; PlanetObserver (Contains Copernicus Data) | ' +
+  STADIA_ATTR;
+
+/**
+ * 生成一款 Stadia 底图配置。
+ * @param {string} slug 瓦片路径（如 alidade_smooth）
+ * @param {{ext?: 'png'|'jpg', maxZoom?: number, retina?: boolean, attribution?: string}} [opts]
+ */
+const stadiaTiles = (slug, { ext = 'png', maxZoom = 20, retina = true, attribution = STADIA_ATTR } = {}) => ({
+  url: `${STADIA_TILES}/${slug}/{z}/{x}/{y}${retina ? '{r}' : ''}.${ext}`,
+  // detectRetina 让 Leaflet 把 {r} 换成 @2x，在 Retina 屏上更清晰
+  options: { maxZoom, detectRetina: retina, attribution },
+  attribution: '© Stadia Maps',
+  requiresKey: true,
+});
+
+/** 底图是否需要 Stadia API Key（桌面端 file:// 不走 localhost 免鉴权） */
+export function requiresStadiaKey(style) {
+  return !!TILES[style]?.requiresKey;
+}
+
 export const TILES = {
   // 高德暗色：复用高德瓦片 + CSS 反色滤镜压暗，保留中文地名，彩色轨迹更突出
   'amap-dark': {
@@ -41,6 +82,23 @@ export const TILES = {
     gcj: true,
     attribution: '© 高德地图',
   },
+  // Stadia Maps 全家桶：桌面端需要 API Key。
+  // Alidade 柔和/明亮系列适合叠大量轨迹；Outdoors/Stamen/OSM Bright 偏户外与艺术风格。
+  // 注：Alidade Satellite 需要 Standard 及以上套餐（免费 Key 会返回 403），其余免费档可用。
+  'alidade-smooth': stadiaTiles('alidade_smooth'),
+  'alidade-smooth-dark': stadiaTiles('alidade_smooth_dark'),
+  'alidade-bright': stadiaTiles('alidade_bright'),
+  'alidade-satellite': stadiaTiles('alidade_satellite', { ext: 'jpg', attribution: STADIA_ATTR_SATELLITE }),
+  outdoors: stadiaTiles('outdoors'),
+  'stamen-toner': stadiaTiles('stamen_toner', { attribution: STADIA_ATTR_STAMEN }),
+  'stamen-terrain': stadiaTiles('stamen_terrain', { attribution: STADIA_ATTR_STAMEN }),
+  'stamen-watercolor': stadiaTiles('stamen_watercolor', {
+    ext: 'jpg',
+    maxZoom: 16, // 水彩风格官方只到 16 级
+    retina: false, // 官方未提供 @2x 瓦片
+    attribution: STADIA_ATTR_WATERCOLOR,
+  }),
+  'osm-bright': stadiaTiles('osm_bright'),
   satellite: {
     url: SATELLITE,
     options: { maxZoom: 19, attribution: '© Esri, Maxar, Earthstar Geographics' },
@@ -55,12 +113,21 @@ export const TILES = {
 };
 
 export const MAP_STYLE_OPTIONS = [
-  { value: 'amap-dark', label: '高德 · 暗色（推荐）' },
+  { value: 'amap-dark', label: '高德 · 暗色' },
   { value: 'amap', label: '高德 · 标准' },
-  { value: 'amap-sat', label: '高德 · 卫星（中文标注）' },
+  { value: 'amap-sat', label: '高德 · 卫星' },
+  { value: 'alidade-smooth', label: 'Stadia · Alidade Smooth' },
+  { value: 'alidade-smooth-dark', label: 'Stadia · Alidade Smooth Dark' },
+  { value: 'alidade-bright', label: 'Stadia · Alidade Bright' },
+  { value: 'alidade-satellite', label: 'Stadia · Alidade Satellite' },
+  { value: 'outdoors', label: 'Stadia · Outdoors' },
+  { value: 'stamen-toner', label: 'Stadia · Stamen Toner' },
+  { value: 'stamen-terrain', label: 'Stadia · Stamen Terrain' },
+  { value: 'stamen-watercolor', label: 'Stadia · Stamen Watercolor' },
+  { value: 'osm-bright', label: 'Stadia · OSM Bright' },
   { value: 'satellite', label: '卫星影像' },
   { value: 'osm', label: 'OpenStreetMap' },
-  { value: 'plain', label: '无底图（离线）' },
+  { value: 'plain', label: '无底图' },
 ];
 
 export function makeMap(el) {
@@ -194,11 +261,23 @@ export function speedColor(v, p5, p95) {
   return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
 }
 
-/** 按主题创建底图图层（含可选的标注参考层），返回 { base, reference, cssClass } */
-export function createTileLayers(style, L) {
+/**
+ * 按主题创建底图图层（含可选的标注参考层）。
+ *
+ * @param {string} style 底图主题名
+ * @param {object} L Leaflet
+ * @param {string} [stadiaKey] Stadia API Key（requiresKey 的主题缺 key 时返回 missingKey）
+ * @returns {{ base: object|null, reference: object|null, cssClass: string, attribution: string, missingKey?: boolean }}
+ */
+export function createTileLayers(style, L, stadiaKey = '') {
   const conf = TILES[style] || TILES.plain;
-  const base = conf.url ? L.tileLayer(conf.url, conf.options) : null;
-  const reference = conf.reference ? L.tileLayer(conf.reference.url, conf.reference.options) : null;
+  // 需要 Key 的底图：没有 Key 时不要发起必然 401 的瓦片请求
+  if (conf.requiresKey && !stadiaKey) {
+    return { base: null, reference: null, cssClass: conf.cssClass || '', attribution: conf.attribution || '', missingKey: true };
+  }
+  const stamp = (url) => (conf.requiresKey ? `${url}?api_key=${encodeURIComponent(stadiaKey)}` : url);
+  const base = conf.url ? L.tileLayer(stamp(conf.url), conf.options) : null;
+  const reference = conf.reference ? L.tileLayer(stamp(conf.reference.url), conf.reference.options) : null;
   return { base, reference, cssClass: conf.cssClass || '', attribution: conf.attribution || '' };
 }
 

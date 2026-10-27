@@ -12,6 +12,8 @@ import {
   lanRegenerateToken,
   lanClearFiles,
   lanCopy,
+  openStadiaKeyDialog,
+  clearStadiaKey,
 } from '../store.js';
 import { km, durationText } from '../lib/format.js';
 
@@ -77,6 +79,11 @@ const lanSpeedText = computed(() => {
 
 function revealUploads() {
   window.api.lanReveal();
+}
+
+/* ---- Stadia 底图 Key ---- */
+function openStadiaConsole() {
+  window.api.openExternal('https://client.stadiamaps.com/dashboard/');
 }
 
 onMounted(() => refreshLanStatus());
@@ -177,6 +184,31 @@ onMounted(() => refreshLanStatus());
           <li>保持本页打开即可看到接收进度，完成后自动解析并更新缓存。</li>
         </ol>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>地图底图（Stadia Maps）</h3>
+        <span class="badge" :class="store.stadiaKey ? 'ok' : 'off'">
+          {{ store.stadiaKey ? '已配置 Key' : '未配置 Key' }}
+        </span>
+      </div>
+      <p class="lan-desc">
+        Stadia Maps 的 9 款底图（Alidade / Outdoors / Stamen / OSM Bright）需要 API Key 才能加载瓦片，
+        桌面端不能走 localhost 免鉴权。注册免费账号后在控制台生成 Key，粘贴进来即可；
+        Key 只保存在本机，不会写入仓库或安装包。
+      </p>
+      <div class="lan-actions">
+        <button class="btn primary" @click="openStadiaKeyDialog()">
+          {{ store.stadiaKey ? '更换 Key' : '填写 Key' }}
+        </button>
+        <button class="btn ghost" @click="openStadiaConsole">获取 Key</button>
+        <button v-if="store.stadiaKey" class="btn ghost" @click="clearStadiaKey">清除 Key</button>
+      </div>
+      <p class="lan-hint">
+        免费 Key 不含「Alidade Satellite」（需 Stadia Standard 及以上）；访问 tiles.stadiamaps.com
+        需要代理时，请确保系统代理已开启（Electron 会跟随系统代理）。
+      </p>
     </div>
 
     <div v-if="store.dataset" class="card">

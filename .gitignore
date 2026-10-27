@@ -10,3 +10,7 @@ android/build
 android/app/build
 android/local.properties
 android/.idea
+# 本地密钥（例如 VITE_STADIA_API_KEY），不要入库
+.env
+.env.local
+.env.*.local

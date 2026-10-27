@@ -17,6 +17,7 @@
   --green: #22c55e;
   --radius: 16px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  --titlebar-h: 58px;
   --font: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI',
     sans-serif;
 }
@@ -92,7 +93,7 @@ body {
   display: flex;
   align-items: center;
   gap: 22px;
-  height: 58px;
+  height: var(--titlebar-h);
   padding: 0 20px;
   flex: 0 0 auto;
   background: rgba(10, 14, 21, 0.86);
@@ -411,6 +412,9 @@ body.platform-darwin .titlebar {
   overflow: hidden;
   background: #0b1119;
   border: 1px solid var(--line-soft);
+  /* 把 Leaflet 内部图层 z-index（瓦片 200 / 轨迹 400 / 控件 1000）限制在面板内，
+     否则会把页面级弹窗（z-index 100）和 Toast 盖住 */
+  isolation: isolate;
 }
 .detail-map-card .map-panel {
   height: 420px;
@@ -1073,6 +1077,46 @@ body.platform-darwin .titlebar {
   margin: 14px 0 6px;
   font-size: 16px;
 }
+
+/* Stadia API Key 输入框 */
+.stadia-dialog {
+  width: min(520px, 92vw);
+  text-align: left;
+}
+.stadia-dialog h3 {
+  margin: 0 0 10px;
+}
+.stadia-desc {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+.stadia-input {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  outline: none;
+}
+.stadia-input:focus {
+  border-color: #33475e;
+}
+.stadia-hint {
+  margin: 10px 0 20px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.stadia-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 .progress-msg {
   margin: 0 0 16px;
   font-size: 12.5px;
@@ -1461,4 +1505,85 @@ body.platform-linux .titlebar {
   color: var(--muted);
   font-size: 12.5px;
   line-height: 1.85;
+}
+
+/* ---------- 地图全屏 ---------- */
+/* 地图卡片铺满内容区：保留顶部自绘标题栏，窗口原生按钮（macOS 红绿灯 / Win 右上角）与导航仍可用。
+   进入/退出走地图右上角按钮或 Esc，避免和浏览器 Fullscreen API 抢占窗口状态。 */
+.map-fs-control.leaflet-bar {
+  border: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.map-fs-control .map-fs-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: #131c28;
+  color: #c3cfdd;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.map-fs-control .map-fs-toggle:hover {
+  background: #1b2735;
+  color: #fff;
+}
+.map-fs-control .map-fs-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.map-fs-control .map-fs-toggle.active {
+  background: #1b2735;
+  color: var(--accent);
+}
+
+/* 全屏时锁住背景页面滚动 */
+body.map-fs .view {
+  overflow: hidden;
+}
+
+.map-card--fs {
+  position: fixed;
+  top: var(--titlebar-h);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 14px 20px 12px;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg);
+  box-shadow: none;
+  overflow: hidden;
+}
+.map-card--fs .card-head,
+.map-card--fs .map-filters,
+.map-card--fs .map-foot {
+  flex: 0 0 auto;
+}
+.map-card--fs .map-panel,
+.map-card--fs.detail-map-card .map-panel {
+  height: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* 兜底：MapPanel 外没有 .map-card 时，直接全屏地图容器 */
+.map-panel--fs {
+  position: fixed;
+  top: var(--titlebar-h);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  height: auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
 }

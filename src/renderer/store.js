@@ -1,14 +1,63 @@
 // 全局状态与动作（不引入 pinia，首期够用）
-import { reactive } from 'vue';
+import { reactive, watch } from 'vue';
+import { requiresStadiaKey, TILES } from './lib/leaflet.js';
+
+// 地图偏好（底图主题 / 淡化 / Stadia API Key）持久化到本地配置文件：<userData>/settings.json
+const DEFAULT_MAP_STYLE = 'amap-dark';
+const DEFAULT_MAP_DIM = 18;
+const STADIA_ENV_KEY = (import.meta.env.VITE_STADIA_API_KEY || '').trim();
 
 export const store = reactive({
   ready: false,
   platform: '',
   info: null,
   dataset: null,
-  mapStyle: 'amap-dark',
-  mapDim: 18, // 底图淡化（0-100），让轨迹更突出
+  mapStyle: DEFAULT_MAP_STYLE,
+  mapDim: DEFAULT_MAP_DIM, // 底图淡化（0-100），让轨迹更突出
   yearFilter: 'all',
+  stadiaKey: STADIA_ENV_KEY,
+  // 需要 API Key 的底图：{ visible, style, fallback }，由 StadiaKeyDialog 渲染
+  stadiaKeyDialog: { visible: false, style: '', fallback: '' },
+});
+
+// 偏好写盘：启动阶段（含 URL 调试参数）不写，避免把临时值固化；滑杆连续拖动做轻量防抖。
+// 底图 Key 无值时 Stadia 底图会被 boot() 回退，回退结果同样不写入，下次有 Key 时仍能恢复原选择。
+let prefsTimer = null;
+function saveMapPrefs(immediate = false) {
+  if (!store.ready) return;
+  clearTimeout(prefsTimer);
+  const write = () => {
+    prefsTimer = null;
+    try {
+      const p = window.api.savePrefs({
+        mapStyle: store.mapStyle,
+        mapDim: Math.round(store.mapDim),
+        stadiaKey: store.stadiaKey,
+      });
+      if (p?.catch) p.catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  };
+  if (immediate) write();
+  else prefsTimer = setTimeout(write, 250);
+}
+watch(
+  () => store.mapStyle,
+  () => saveMapPrefs()
+);
+watch(
+  () => store.mapDim,
+  () => saveMapPrefs()
+);
+// Key 变更频率低，直接落盘
+watch(
+  () => store.stadiaKey,
+  () => saveMapPrefs(true)
+);
+// 退出前把防抖队列里还没落盘的偏好补上
+window.addEventListener('beforeunload', () => {
+  if (prefsTimer) saveMapPrefs(true);
 });
 
 export const progress = reactive({ visible: false, message: '', percent: 0 });
@@ -33,6 +82,52 @@ export function showToast(message, type = 'info', ms = 2600) {
   toastTimer = setTimeout(() => (toast.visible = false), ms);
 }
 
+/* ---------------- 地图底图：Stadia API Key ---------------- */
+
+/** 切换底图；选到需要 Key 的 Stadia 底图但还没配置时，弹出 Key 输入框 */
+export function setMapStyle(style) {
+  if (!style || style === store.mapStyle) return;
+  const fallback = store.mapStyle;
+  store.mapStyle = style;
+  if (requiresStadiaKey(style) && !store.stadiaKey) {
+    store.stadiaKeyDialog = { visible: true, style, fallback };
+  }
+}
+
+/** 手动打开 Key 输入框（「数据」页配置/更换 Key 用） */
+export function openStadiaKeyDialog(style = store.mapStyle) {
+  store.stadiaKeyDialog = { visible: true, style, fallback: '' };
+}
+
+export function cancelStadiaKeyDialog() {
+  const { fallback } = store.stadiaKeyDialog;
+  store.stadiaKeyDialog = { visible: false, style: '', fallback: '' };
+  // 从底图下拉框触发时，取消后回到原来的底图
+  if (fallback) store.mapStyle = fallback;
+}
+
+export function saveStadiaKey(raw) {
+  const key = String(raw ?? '').trim();
+  // 写入本地配置文件（由 stadiaKey 的 watcher 落盘）
+  store.stadiaKey = key || STADIA_ENV_KEY;
+  const { fallback } = store.stadiaKeyDialog;
+  store.stadiaKeyDialog = { visible: false, style: '', fallback: '' };
+
+  if (!store.stadiaKey && requiresStadiaKey(store.mapStyle)) {
+    // 清空 Key 时不要留下空底图
+    store.mapStyle = fallback || 'amap-dark';
+    showToast('未填写 Stadia API Key，已切回「高德 · 暗色」', 'info', 4200);
+  } else if (key) {
+    showToast('Stadia API Key 已保存，正在加载底图', 'success');
+  }
+}
+
+/** 清除本机保存的 Key（若构建时注入了 VITE_STADIA_API_KEY，会回退到它） */
+export function clearStadiaKey() {
+  saveStadiaKey('');
+  showToast(store.stadiaKey ? '已清除本机 Key，回退到构建配置的 Key' : '已清除本机保存的 Stadia Key');
+}
+
 export function setDataset(data) {
   store.dataset = data;
   store.yearFilter = 'all';
@@ -48,10 +143,33 @@ export async function boot() {
   } catch (e) {
     console.error('info failed', e);
   }
-  // 支持 URL 参数调试/深链：?map=amap-dark&dim=40
+
+  // 读取本地配置文件里的地图偏好（底图主题 / 淡化 / Stadia Key），无效值直接忽略
+  try {
+    const prefs = await window.api.loadPrefs();
+    const data = prefs?.data;
+    if (data && typeof data === 'object') {
+      if (typeof data.mapStyle === 'string' && data.mapStyle && TILES[data.mapStyle]) {
+        store.mapStyle = data.mapStyle;
+      }
+      const dim = Number(data.mapDim);
+      if (data.mapDim !== null && data.mapDim !== '' && Number.isFinite(dim)) {
+        store.mapDim = Math.max(0, Math.min(100, dim));
+      }
+      if (typeof data.stadiaKey === 'string') {
+        store.stadiaKey = data.stadiaKey.trim() || STADIA_ENV_KEY;
+      }
+    }
+  } catch (e) {
+    console.error('load prefs failed', e);
+  }
+
+  // 支持 URL 参数调试/深链：?map=amap-dark&dim=40（只对本次启动生效，不写回文件）
   const params = new URLSearchParams(location.search);
   if (params.get('map')) store.mapStyle = params.get('map');
   if (params.get('dim') !== null && params.get('dim') !== '') store.mapDim = Number(params.get('dim'));
+  // 深链/配置指定了需要 Key 的底图但本机还没配置 Key：回退，避免打开就是空地图
+  if (requiresStadiaKey(store.mapStyle) && !store.stadiaKey) store.mapStyle = 'amap-dark';
 
   const cached = await window.api.loadCached();
   if (cached?.ok) {

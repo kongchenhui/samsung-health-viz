@@ -47,6 +47,37 @@ function writeCache(data) {
   fs.writeFileSync(cacheFile(), JSON.stringify(data));
 }
 
+/* ---------- 本地偏好（地图主题 / 底图淡化 / Stadia Key） ---------- */
+const prefsFile = () => path.join(app.getPath('userData'), 'settings.json');
+
+function readPrefs() {
+  try {
+    const data = JSON.parse(fs.readFileSync(prefsFile(), 'utf8'));
+    return data && typeof data === 'object' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePrefs(input) {
+  // 只接受已知字段，避免渲染进程写入任意内容
+  const data = {};
+  if (typeof input?.mapStyle === 'string' && input.mapStyle.length <= 64) data.mapStyle = input.mapStyle;
+  if (input?.mapDim !== null && input?.mapDim !== undefined && Number.isFinite(Number(input.mapDim))) {
+    data.mapDim = Math.max(0, Math.min(100, Math.round(Number(input.mapDim))));
+  }
+  if (typeof input?.stadiaKey === 'string' && input.stadiaKey.length <= 256) {
+    data.stadiaKey = input.stadiaKey.trim();
+  }
+  try {
+    fs.mkdirSync(path.dirname(prefsFile()), { recursive: true });
+    fs.writeFileSync(prefsFile(), JSON.stringify(data));
+    return { ok: true, path: prefsFile() };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
 /* ---------- 解析数据包 ---------- */
 function makeReader(target) {
   const st = fs.statSync(target);
@@ -247,6 +278,10 @@ function registerIpc() {
     const data = readCache();
     return data ? { ok: true, data } : { ok: false };
   });
+
+  // 地图偏好（底图主题 / 淡化 / Stadia Key）持久化到 userData/settings.json
+  ipcMain.handle('prefs:load', () => ({ ok: true, data: readPrefs(), path: prefsFile() }));
+  ipcMain.handle('prefs:save', (_e, data) => writePrefs(data));
 
   // 选择 ZIP
   ipcMain.handle('data:pickZip', async () => {
