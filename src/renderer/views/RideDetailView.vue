@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { store } from '../store.js';
+import { store, setMapStyle } from '../store.js';
 import { km, speedKmh, durationText, dateCN, weekdayCN, timeHM, paceText } from '../lib/format.js';
 import { yearColor } from '../lib/data.js';
 import { speedColor, MAP_STYLE_OPTIONS } from '../lib/leaflet.js';
@@ -139,12 +139,20 @@ const stats = computed(() => {
             <span>底图淡化</span>
             <input v-model.number="store.mapDim" type="range" min="0" max="100" step="1" />
           </label>
-          <select v-model="store.mapStyle" class="select">
+          <select class="select" :value="store.mapStyle" @change="setMapStyle($event.target.value)">
             <option v-for="o in MAP_STYLE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>
       </div>
-      <MapPanel v-if="ride.hasTrack" mode="detail" :segments="segments" :map-style="store.mapStyle" :coord-sys="ride.coordSys || 'wgs84'" :dim="store.mapDim" />
+      <MapPanel
+        v-if="ride.hasTrack"
+        mode="detail"
+        :segments="segments"
+        :map-style="store.mapStyle"
+        :stadia-key="store.stadiaKey"
+        :coord-sys="ride.coordSys || 'wgs84'"
+        :dim="store.mapDim"
+      />
       <div v-else class="map-empty">
         这次骑行没有记录 GPS 轨迹（可能手表未定位或为室内骑行），下方仍有速度/心率数据。
       </div>

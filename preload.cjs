@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('api', {
   parse: (target) => ipcRenderer.invoke('data:parse', target),
   clear: () => ipcRenderer.invoke('data:clear'),
   reveal: (target) => ipcRenderer.invoke('data:reveal', target),
+  loadPrefs: () => ipcRenderer.invoke('prefs:load'),
+  savePrefs: (data) => ipcRenderer.invoke('prefs:save', data),
   onProgress: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on('data:progress', handler);

@@ -5,6 +5,7 @@ import { store, boot, parseTarget, pickZip, pickFolder, setupLanEvents, refreshL
 import TitleBar from './components/TitleBar.vue';
 import ProgressOverlay from './components/ProgressOverlay.vue';
 import ToastMessage from './components/ToastMessage.vue';
+import StadiaKeyDialog from './components/StadiaKeyDialog.vue';
 import WelcomeView from './views/WelcomeView.vue';
 
 const unsubs = [];
@@ -23,6 +24,16 @@ function onDrop(e) {
   if (p) parseTarget(p);
 }
 
+// 底图版权里的外链用系统浏览器打开，避免在应用内新开窗口
+function onAttributionClick(e) {
+  const link = e.target instanceof Element ? e.target.closest('.leaflet-control-attribution a') : null;
+  if (!link) return;
+  const href = link.getAttribute('href') || '';
+  if (!/^https?:\/\//i.test(href)) return;
+  e.preventDefault();
+  window.api.openExternal(href);
+}
+
 onMounted(async () => {
   await boot();
   unsubs.push(window.api.onMenuPickZip(() => pickZip()));
@@ -32,12 +43,14 @@ onMounted(async () => {
   refreshLanStatus();
   window.addEventListener('dragover', onDragOver);
   window.addEventListener('drop', onDrop);
+  document.addEventListener('click', onAttributionClick);
 });
 
 onBeforeUnmount(() => {
   unsubs.forEach((u) => u && u());
   window.removeEventListener('dragover', onDragOver);
   window.removeEventListener('drop', onDrop);
+  document.removeEventListener('click', onAttributionClick);
 });
 </script>
 
@@ -51,6 +64,7 @@ onBeforeUnmount(() => {
       </router-view>
     </main>
     <ProgressOverlay />
+    <StadiaKeyDialog />
     <ToastMessage />
   </div>
 </template>

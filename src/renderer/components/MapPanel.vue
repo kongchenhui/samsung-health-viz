@@ -1,7 +1,8 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import L from 'leaflet';
-import { makeMap, projectPoint, createTileLayers, tileOpacity } from '../lib/leaflet.js';
+import { makeMap, projectPoint, createTileLayers, tileOpacity, requiresStadiaKey } from '../lib/leaflet.js';
+import { showToast } from '../store.js';
 
 const props = defineProps({
   mode: { type: String, default: 'career' }, // career | detail
@@ -9,6 +10,7 @@ const props = defineProps({
   segments: { type: Array, default: () => [] },
   mapStyle: { type: String, default: 'amap-dark' },
   coordSys: { type: String, default: 'wgs84' }, // 详情页当前骑行的坐标基准
+  stadiaKey: { type: String, default: '' }, // Stadia Maps API Key（alidade 底图需要）
   dim: { type: Number, default: 0 }, // 底图淡化 0-100
   fit: { type: Boolean, default: true },
 });
@@ -21,7 +23,71 @@ let tileBase = null;
 let tileRef = null;
 let ro = null;
 let cssClass = '';
+let tileErrorShown = false;
 const fitPoints = [];
+
+/* ---------- 全屏 ---------- */
+// 全屏时把所在的地图卡片（.map-card）固定到内容区，保留自绘标题栏，
+// 这样窗口的原生按钮（macOS 红绿灯 / Windows 右上角）与导航仍然可用。
+const FS_CARD_CLASS = 'map-card--fs';
+const FS_PANEL_CLASS = 'map-panel--fs'; // 兜底：没有 .map-card 祖先时直接全屏地图容器
+const ICON_EXPAND =
+  '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>';
+const ICON_COMPRESS =
+  '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2v4H2M10 2v4h4M14 6h-4v4M2 10h4v4"/></svg>';
+
+let fsBtn = null;
+let isFullscreen = false;
+
+function setFullscreen(on) {
+  if (on === isFullscreen) return;
+  const card = el.value?.closest('.map-card');
+  const target = card || el.value;
+  if (!target) return;
+
+  isFullscreen = on;
+  target.classList.toggle(card ? FS_CARD_CLASS : FS_PANEL_CLASS, on);
+  // 全屏期间锁住页面滚动，避免背景内容跟着滚
+  document.body.classList.toggle('map-fs', on);
+
+  if (fsBtn) {
+    fsBtn.innerHTML = on ? ICON_COMPRESS : ICON_EXPAND;
+    fsBtn.title = on ? '退出全屏（Esc）' : '全屏查看';
+    fsBtn.setAttribute('aria-label', fsBtn.title);
+    fsBtn.setAttribute('aria-pressed', String(on));
+    fsBtn.classList.toggle('active', on);
+  }
+  // 容器尺寸变了：立即同步一次，再等下一帧布局落定后补一次
+  map?.invalidateSize({ animate: false });
+  requestAnimationFrame(() => map?.invalidateSize({ animate: false }));
+}
+
+function onKeydown(e) {
+  if (isFullscreen && e.key === 'Escape') setFullscreen(false);
+}
+
+function createFullscreenControl() {
+  const FullscreenControl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd() {
+      const box = L.DomUtil.create('div', 'leaflet-bar map-fs-control');
+      fsBtn = L.DomUtil.create('button', 'map-fs-toggle', box);
+      fsBtn.type = 'button';
+      fsBtn.title = '全屏查看';
+      fsBtn.setAttribute('aria-label', '全屏查看');
+      fsBtn.setAttribute('aria-pressed', 'false');
+      fsBtn.innerHTML = ICON_EXPAND;
+      L.DomEvent.disableClickPropagation(box);
+      L.DomEvent.disableScrollPropagation(box);
+      L.DomEvent.on(fsBtn, 'click', (e) => {
+        L.DomEvent.stop(e);
+        setFullscreen(!isFullscreen);
+      });
+      return box;
+    },
+  });
+  return new FullscreenControl();
+}
 
 function toLatLng(p, coordSys) {
   const [lat, lon] = projectPoint(props.mapStyle, p[0], p[1], coordSys || 'wgs84');
@@ -139,15 +205,18 @@ function refreshTiles() {
     map.removeLayer(tileRef);
     tileRef = null;
   }
+  tileErrorShown = false;
   const container = map.getContainer();
   if (cssClass) container.classList.remove(cssClass);
 
-  const layers = createTileLayers(props.mapStyle, L);
+  const layers = createTileLayers(props.mapStyle, L, props.stadiaKey);
   cssClass = layers.cssClass || '';
   if (cssClass) container.classList.add(cssClass);
 
   if (layers.base) {
     tileBase = layers.base.addTo(map);
+    // 瓦片持续失败（Key 无效 / 套餐不支持 / 断网）时提示一次，避免用户对着灰底图猜
+    tileBase.on('tileerror', onTileError);
     applyDim();
   }
   if (layers.reference) {
@@ -156,19 +225,37 @@ function refreshTiles() {
   }
 }
 
+function onTileError() {
+  if (tileErrorShown) return;
+  tileErrorShown = true;
+  const keyed = requiresStadiaKey(props.mapStyle);
+  showToast(
+    keyed
+      ? '底图加载失败：请检查 Stadia API Key 是否有效，或套餐/额度是否支持该底图'
+      : '底图加载失败，请检查网络或稍后重试',
+    'error',
+    5200
+  );
+}
+
 onMounted(() => {
   map = makeMap(el.value);
   routeLayer = L.layerGroup().addTo(map);
   refreshTiles();
   draw();
+  createFullscreenControl().addTo(map);
+  window.addEventListener('keydown', onKeydown);
   ro = new ResizeObserver(() => map && map.invalidateSize());
   ro.observe(el.value);
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown);
+  setFullscreen(false); // 离开页面（含全屏时点击轨迹跳转）要还原类名与滚动锁定
   ro?.disconnect();
   map?.remove();
   map = null;
+  fsBtn = null;
 });
 
 watch(
@@ -186,6 +273,11 @@ watch(
 watch(
   () => props.dim,
   () => applyDim()
+);
+// Stadia Key 变化（首次填写 / 更换）时重建瓦片图层
+watch(
+  () => props.stadiaKey,
+  () => refreshTiles()
 );
 </script>
 

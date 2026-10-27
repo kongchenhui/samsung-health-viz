@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { store } from '../store.js';
+import { store, setMapStyle } from '../store.js';
 import { careerStats, yearStats, personalBests, monthHeat, yearColor, rideTooltipHtml } from '../lib/data.js';
 import { km, speedKmh, durationText } from '../lib/format.js';
 import { MAP_STYLE_OPTIONS } from '../lib/leaflet.js';
@@ -179,7 +179,7 @@ function openRide(id) {
             <span>底图淡化</span>
             <input v-model.number="store.mapDim" type="range" min="0" max="100" step="1" />
           </label>
-          <select v-model="store.mapStyle" class="select">
+          <select class="select" :value="store.mapStyle" @change="setMapStyle($event.target.value)">
             <option v-for="o in MAP_STYLE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>
@@ -214,7 +214,14 @@ function openRide(id) {
           </div>
         </div>
 
-        <MapPanel mode="career" :tracks="tracks" :map-style="store.mapStyle" :dim="store.mapDim" @pick="openRide" />
+        <MapPanel
+          mode="career"
+          :tracks="tracks"
+          :map-style="store.mapStyle"
+          :stadia-key="store.stadiaKey"
+          :dim="store.mapDim"
+          @pick="openRide"
+        />
         <div class="map-foot">
           <span v-for="y in years" :key="y" class="legend-item">
             <i :style="{ background: yearColor(`${y}-01-01`) }"></i>{{ y }}
