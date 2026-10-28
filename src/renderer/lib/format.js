@@ -1,4 +1,4 @@
-// 展示用格式化（语言相关文案在 src/locales/*.json 的 format / month / weather 段）
+// 展示用格式化（语言相关文案在 src/locales/*.json 的 format / month 段；用户数据本身不翻译）
 import { t } from './i18n.js';
 
 /** 月份名（1-12，取语言文件里的 month.N） */
@@ -70,55 +70,13 @@ export function monthTitle(year, month) {
   return t('format.monthTitle', { y: year, m: month, mon: monthName(month) });
 }
 
-// 天气短语来自三星导出（随导出语言变化），这里只映射常见值，未知原样展示
-const WEATHER_PHRASES = {
-  晴: 'clear',
-  晴朗: 'clear',
-  clear: 'clear',
-  sunny: 'clear',
-  多云: 'partlyCloudy',
-  局部多云: 'partlyCloudy',
-  'partly cloudy': 'partlyCloudy',
-  阴: 'cloudy',
-  阴天: 'cloudy',
-  cloudy: 'cloudy',
-  overcast: 'cloudy',
-  小雨: 'lightRain',
-  阵雨: 'lightRain',
-  'light rain': 'lightRain',
-  drizzle: 'lightRain',
-  中雨: 'rain',
-  rain: 'rain',
-  大雨: 'heavyRain',
-  暴雨: 'heavyRain',
-  'heavy rain': 'heavyRain',
-  雷阵雨: 'thunderstorm',
-  雷雨: 'thunderstorm',
-  thunderstorm: 'thunderstorm',
-  雨夹雪: 'sleet',
-  sleet: 'sleet',
-  小雪: 'lightSnow',
-  'light snow': 'lightSnow',
-  snow: 'snow',
-  中雪: 'snow',
-  大雪: 'heavySnow',
-  'heavy snow': 'heavySnow',
-  雾: 'fog',
-  fog: 'fog',
-  mist: 'mist',
-  霾: 'haze',
-  haze: 'haze',
-  沙尘: 'haze',
-  大风: 'windy',
-  windy: 'windy',
-};
-
-/** 天气短语本地化：命中映射返回当前语言文案，未知短语原样返回 */
+/**
+ * 天气短语：原样展示三星导出里的文案，不做语言映射。
+ * 这是用户数据（随导出包/手机语言而定），切换界面语言不应该改写它；
+ * i18n 只用于界面 label、日期/时长等展示格式，不用于翻译数据内容。
+ */
 export function weatherText(phrase) {
-  const raw = String(phrase ?? '').trim();
-  if (!raw) return '';
-  const key = WEATHER_PHRASES[raw] || WEATHER_PHRASES[raw.toLowerCase()];
-  return key ? t('weather.' + key) : raw;
+  return String(phrase ?? '').trim();
 }
 
 export function timeHM(iso) {

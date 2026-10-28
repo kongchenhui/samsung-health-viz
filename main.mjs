@@ -331,15 +331,28 @@ function applyThemeMode(mode) {
   return true;
 }
 
+/* ---------- 窗口几何记忆 ----------
+ * 直接用 Electron 内置的 windowStatePersistence（需要给窗口一个唯一 name）：
+ * 位置、大小、最大化/全屏状态由 Electron 存在 <userData>/Local State 的 windowStates 段，
+ * 几何变化时自动更新，启动时自动还原并把超出屏幕的窗口夹回可见区域（保留尺寸）。
+ * 因此这里不需要第三方库，也不需要自己在 resize/move/close 时落盘。
+ * 注意：--window-size 调试参数优先于记忆值，该模式下不启用记忆（截图冒烟的尺寸不该写回）。
+ */
+
 function createWindow() {
   // 主题在窗口创建前就要定好，避免先出现深色底再被 paint 成浅色
   nativeTheme.themeSource = themeMode;
   const dark = resolvedDark();
+  // 调试：--window-size=980x720 强制主窗口尺寸（用于冒烟截图设置页布局）
+  const forcedSize = argValue('window-size');
   const winOptions = {
+    // 首次启动的默认几何；有历史记录时由 windowStatePersistence 覆盖
     width: 1480,
     height: 940,
     minWidth: 1080,
     minHeight: 700,
+    // 内置窗口状态记忆（Electron 45+）：name 唯一标识这个窗口
+    ...(forcedSize ? {} : { name: 'main', windowStatePersistence: true }),
     show: false,
     backgroundColor: dark ? THEME_BG.dark : THEME_BG.light,
     title: 'Samsung Health Viz',
@@ -356,7 +369,6 @@ function createWindow() {
       ],
     },
   };
-
   if (isMac) {
     winOptions.titleBarStyle = 'hiddenInset';
     winOptions.trafficLightPosition = { x: 18, y: 18 };
@@ -366,8 +378,6 @@ function createWindow() {
     winOptions.titleBarOverlay = dark ? TITLEBAR_OVERLAY.dark : TITLEBAR_OVERLAY.light;
   }
 
-  // 调试：--window-size=980x720 强制主窗口尺寸（用于冒烟截图设置页布局）
-  const forcedSize = argValue('window-size');
   if (forcedSize) {
     const [fw, fh] = forcedSize.split('x').map(Number);
     if (fw > 0 && fh > 0) {
@@ -458,16 +468,21 @@ function createSettingsWindow(tab) {
     return settingsWin;
   }
   const dark = resolvedDark();
-  // 默认尺寸别太高：按屏幕可用区域自适应，保证小屏也能完整显示
-  const workArea = screen.getPrimaryDisplay().workAreaSize;
-  const width = Math.min(1000, Math.max(780, workArea.width - 160));
-  const height = Math.min(720, Math.max(540, workArea.height - 140));
+  // 默认尺寸别太高：按主窗口所在屏幕的可用区域自适应，保证小屏也能完整显示；
+  // 有历史几何时由 windowStatePersistence 覆盖
+  const hostDisplay = win && !win.isDestroyed()
+    ? screen.getDisplayMatching(win.getBounds())
+    : screen.getPrimaryDisplay();
+  const workArea = hostDisplay.workAreaSize;
   settingsWin = new BrowserWindow({
-    width,
-    height,
+    width: Math.min(1000, Math.max(780, workArea.width - 160)),
+    height: Math.min(720, Math.max(540, workArea.height - 140)),
     minWidth: 780,
     minHeight: 540,
     center: true,
+    // 设置窗口同样记忆几何；它不能最大化/全屏，不需要恢复 displayMode
+    name: 'settings',
+    windowStatePersistence: { displayMode: false },
     show: false,
     resizable: true,
     maximizable: false,

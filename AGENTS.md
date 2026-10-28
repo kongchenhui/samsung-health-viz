@@ -43,12 +43,15 @@ scripts/                      开发启动与自检脚本
 - **设置窗口是独立窗口**：所有进入设置页的入口只做 `router.push('/settings')`（可带 `?tab=general|map|data|about`），唯一的开窗点是 `src/renderer/router.js` 的 `router.beforeEach`；组件里不要再直接调用 `window.api.openSettings()`。
 - **设置窗口不要加 `parent` / `alwaysOnTop`**：macOS 会把有 parent 的窗口当子窗口，永远叠在主窗口上方。
 - **i18n 文案只放 JSON**：`src/locales/<locale>.json` 的 `ui`（渲染层）/ `main`（主进程）两段；zh/en key 必须同步；日期、星期、时长等模板放 `ui.format`，不要在 JS 里按语言写死分支；新增语言 = 新增一个 JSON 文件。
+- **用户数据不国际化**：导出包里的原始内容（天气短语、设备/供应商名、单位等）一律原样展示，不翻译成界面语言；`src/locales` 只放界面文案与格式模板，不要为数据内容新建语言映射表。
 - **主题颜色**：结构色（坐标轴、描边、tooltip、底图 casing）跟随深浅主题；数据色（年份、车速色阶、站点色）两套主题共用同一组亮色，不要“整体变暗”。
 - **城市坐标只用于就近匹配**（80km 内取最近地级行政区，超出显示「区域 N」），不参与地图渲染；不要把县级市加进来。
 - **地图坐标**：轨迹基准（`wgs84` / `gcj02`）由 `src/core/coord-sys.mjs` 判定，渲染前统一走 `src/renderer/lib/leaflet.js` 的 `projectPoint`；改判定或换算逻辑先跑 `pnpm check:coord`。
 - **主进程文本**：不要往 `main.mjs` 里内嵌文案，读 `src/locales/*.json` 的 `main` 段；新增 IPC 时同步改 `preload.cjs`。
 - **多窗口状态**：偏好变更用 `broadcastPrefs()`，数据变更用 `broadcast()`，不要只在单个窗口里改 store。
 - **滚动条**：主窗口和设置窗口的滚动区域都要接入主题滚动条（`.view` / `.split-list` / `.settings-content` / `.settings-sidebar`），亮色/暗色各一套。
+- **窗口几何**：用 Electron 内置的 `windowStatePersistence`（窗口 `name` 唯一，状态在 `<userData>/Local State` 的 `windowStates`），不要再引 `electron-window-state` 之类的库或手写落盘逻辑。
+- **滚动位置按页面记忆**：主窗口 `.view` 是所有路由共用的滚动容器，`App.vue` 按 `route.fullPath` 记忆/还原 `scrollTop`；设置页 `.settings-content` 按 `?tab=` 记忆。新增页面/分栏沿用这套机制，不要在别的组件里直接改容器滚动位置。
 - 代码注释用中文，写清“为什么”而不是复述代码；新增/修改数据格式时同步更新 `docs/development.md` 与对应自检。
 
 ## 数据与隐私
@@ -75,8 +78,8 @@ scripts/                      开发启动与自检脚本
 
 | 参数 | 作用 |
 |---|---|
-| `--user-data=<dir>` | 隔离用户数据目录（缓存 / settings.json），截图和测试必须用 |
-| `--window-size=1440x940` | 强制主窗口尺寸 |
+| `--user-data=<dir>` | 隔离用户数据目录（缓存 / settings.json / 窗口几何 Local State），截图和测试必须用 |
+| `--window-size=1440x940` | 强制主窗口尺寸（该次运行不启用窗口几何记忆） |
 | `--window-kind=settings` | 主窗口直接渲染设置页（截图用；正式入口仍走独立窗口） |
 | `--data=<path>` | 启动后解析指定数据包 |
 | `--shot=<png>` / `--shot-delay=<ms>` / `--shot-page=<hash>` / `--shot-js=<js>` | 延时截图、跳路由、截图前执行 JS |
