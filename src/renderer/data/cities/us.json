@@ -1,0 +1,8 @@
+{
+  "country": { "code": "US", "names": { "zh": "美国", "en": "United States" } },
+  "coordSys": "wgs84",
+  "cities": [
+    { "names": { "zh": "纽约", "en": "New York" }, "lat": 40.7128, "lon": -74.006 },
+    { "names": { "zh": "旧金山", "en": "San Francisco" }, "lat": 37.7749, "lon": -122.4194 }
+  ]
+}

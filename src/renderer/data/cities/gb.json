@@ -1,0 +1,7 @@
+{
+  "country": { "code": "GB", "names": { "zh": "英国", "en": "United Kingdom" } },
+  "coordSys": "wgs84",
+  "cities": [
+    { "names": { "zh": "伦敦", "en": "London" }, "lat": 51.5074, "lon": -0.1278 }
+  ]
+}

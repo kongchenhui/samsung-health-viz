@@ -1,0 +1,7 @@
+{
+  "country": { "code": "CA", "names": { "zh": "加拿大", "en": "Canada" } },
+  "coordSys": "wgs84",
+  "cities": [
+    { "names": { "zh": "温哥华", "en": "Vancouver" }, "lat": 49.2827, "lon": -123.1207 }
+  ]
+}

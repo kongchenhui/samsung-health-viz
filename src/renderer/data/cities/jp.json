@@ -1,0 +1,7 @@
+{
+  "country": { "code": "JP", "names": { "zh": "日本", "en": "Japan" } },
+  "coordSys": "wgs84",
+  "cities": [
+    { "names": { "zh": "东京", "en": "Tokyo" }, "lat": 35.6762, "lon": 139.6503 }
+  ]
+}

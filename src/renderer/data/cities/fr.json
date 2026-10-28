@@ -1,0 +1,7 @@
+{
+  "country": { "code": "FR", "names": { "zh": "法国", "en": "France" } },
+  "coordSys": "wgs84",
+  "cities": [
+    { "names": { "zh": "巴黎", "en": "Paris" }, "lat": 48.8566, "lon": 2.3522 }
+  ]
+}

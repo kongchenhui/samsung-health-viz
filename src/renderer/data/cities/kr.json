@@ -1,0 +1,7 @@
+{
+  "country": { "code": "KR", "names": { "zh": "韩国", "en": "South Korea" } },
+  "coordSys": "wgs84",
+  "cities": [
+    { "names": { "zh": "首尔", "en": "Seoul" }, "lat": 37.5665, "lon": 126.978 }
+  ]
+}

@@ -1,0 +1,438 @@
+{
+  "meta": {
+    "name": "English",
+    "htmlLang": "en"
+  },
+  "ui": {
+    "common": {
+      "all": "All",
+      "cancel": "Cancel",
+      "noData": "No data",
+      "yes": "Yes",
+      "no": "No",
+      "min": "min"
+    },
+    "settings": {
+      "title": "Settings",
+      "groupApp": "Settings",
+      "groupAbout": "About",
+      "navGeneral": "General",
+      "navMap": "Map",
+      "navData": "Data",
+      "generalSubtitle": "Theme and language",
+      "mapSubtitle": "Basemap behaviour and Stadia API key",
+      "dataSubtitle": "Package import and direct upload",
+      "aboutSubtitle": "Version, updates and parsing notes",
+      "appearance": "Appearance & Language",
+      "theme": "Theme",
+      "language": "Language",
+      "followTheme": "Basemap follows theme",
+      "followThemeDesc": "When on, the basemap switches between light/dark pairs when the theme changes (AMAP dark/standard, Stadia Alidade Smooth Dark/Smooth). Picking a basemap manually turns this off.",
+      "followThemeNoPair": "The current basemap “{style}” has no light/dark variant, so following the theme will not change it.",
+      "on": "On",
+      "off": "Off",
+      "about": "About",
+      "version": "Version",
+      "updates": "Updates",
+      "checkUpdates": "Check for updates",
+      "checking": "Checking…",
+      "openRelease": "Open release page",
+      "build": "Build",
+      "buildInfo": "Electron {electron} · Chrome {chrome}",
+      "mode": {
+        "system": "System",
+        "dark": "Dark",
+        "light": "Light"
+      }
+    },
+    "nav": {
+      "career": "Career",
+      "rides": "Rides"
+    },
+    "brand": {
+      "name": "Samsung Health Viz",
+      "sub": "Samsung Health Viz · Cycling"
+    },
+    "titlebar": {
+      "sourceChip": "Package · Account {name}",
+      "exported": "exported {date}",
+      "localPackage": "Local package"
+    },
+    "mapStyle": {
+      "amap-dark": "AMAP · Dark",
+      "amap": "AMAP · Standard",
+      "amap-sat": "AMAP · Satellite",
+      "alidade-smooth": "Stadia · Alidade Smooth",
+      "alidade-smooth-dark": "Stadia · Alidade Smooth Dark",
+      "alidade-bright": "Stadia · Alidade Bright",
+      "alidade-satellite": "Stadia · Alidade Satellite",
+      "outdoors": "Stadia · Outdoors",
+      "stamen-toner": "Stadia · Stamen Toner",
+      "stamen-terrain": "Stadia · Stamen Terrain",
+      "stamen-watercolor": "Stadia · Stamen Watercolor",
+      "osm-bright": "Stadia · OSM Bright",
+      "satellite": "Satellite imagery",
+      "osm": "OpenStreetMap",
+      "plain": "No basemap"
+    },
+    "month": {
+      "1": "Jan",
+      "2": "Feb",
+      "3": "Mar",
+      "4": "Apr",
+      "5": "May",
+      "6": "Jun",
+      "7": "Jul",
+      "8": "Aug",
+      "9": "Sep",
+      "10": "Oct",
+      "11": "Nov",
+      "12": "Dec"
+    },
+    "weather": {
+      "clear": "Clear",
+      "partlyCloudy": "Partly cloudy",
+      "cloudy": "Cloudy",
+      "lightRain": "Light rain",
+      "rain": "Rain",
+      "heavyRain": "Heavy rain",
+      "thunderstorm": "Thunderstorm",
+      "sleet": "Sleet",
+      "lightSnow": "Light snow",
+      "snow": "Snow",
+      "heavySnow": "Heavy snow",
+      "fog": "Fog",
+      "mist": "Mist",
+      "haze": "Haze",
+      "windy": "Windy"
+    },
+    "career": {
+      "title": "Cycling Career",
+      "subtitle": "{range} · {count} rides · {tracks} tracks · avg {speed}",
+      "totalDistance": "Total Distance",
+      "ridesCount": "{n} rides",
+      "ridesCount_one": "1 ride",
+      "subtitle_one": "{range} · 1 ride · {tracks} tracks · avg {speed}",
+      "totalTime": "Total Time",
+      "totalTimeSub": "All ride records",
+      "totalGain": "Elevation Gain",
+      "totalGainSub": "Samsung estimate / GPS altitude",
+      "totalCalories": "Total Calories",
+      "avgSpeed": "Avg Speed",
+      "withTrack": "With Track",
+      "withTrackSub": "Mappable rides",
+      "routes": "Cycling Routes",
+      "tracksCount": "{label} · {n} tracks",
+      "dimBasemap": "Dim basemap",
+      "dimBasemapTip": "Dim the basemap: higher = fainter map, more prominent tracks",
+      "allAreas": "All areas",
+      "area": "Area {n}",
+      "mapFootHint": "Hover for summary · click to open the ride",
+      "byYear": "By Year",
+      "distancePerKm": "Distance / km",
+      "personalBests": "Personal Bests",
+      "calendar": "Ride Calendar",
+      "calendarHint": "Darker = more distance that month",
+      "recent": "Recent Rides",
+      "allRecords": "All records →",
+      "noTrackData": "No GPS tracks in this package, so the map stays empty"
+    },
+    "pb": {
+      "distance": "Longest ride",
+      "duration": "Longest duration",
+      "speed": "Fastest avg speed",
+      "climb": "Biggest climb",
+      "calories": "Most calories burned"
+    },
+    "heatmap": {
+      "more": "More",
+      "less": "Less",
+      "tipTitle": "{title}",
+      "noRides": "No rides",
+      "tip": "{km} km · {n} rides"
+    },
+    "rides": {
+      "title": "Rides",
+      "subtitle": "{total} rides in total, {tracked} with GPS tracks",
+      "subtitle_one": "1 ride in total, {tracked} with GPS tracks",
+      "allYears": "All years",
+      "sortDateDesc": "By time (newest first)",
+      "sortDateAsc": "By time (oldest first)",
+      "sortDist": "By distance",
+      "sortDur": "By duration",
+      "thDate": "Date",
+      "thDistance": "Distance",
+      "thDuration": "Duration",
+      "thAvgSpeed": "Avg Speed",
+      "thGain": "Gain",
+      "thAvgHr": "Avg HR",
+      "thWeather": "Weather",
+      "thTrack": "Track",
+      "empty": "No rides match the filter"
+    },
+    "detail": {
+      "back": "← Back to rides",
+      "noTrack": "No GPS track",
+      "humidityWind": "Humidity {humidity}% · Wind {wind} {unit}",
+      "distance": "Distance",
+      "duration": "Duration",
+      "avgSpeed": "Avg Speed",
+      "maxSpeed": "Max Speed",
+      "gain": "Elevation Gain",
+      "loss": "Elevation Loss",
+      "calories": "Calories",
+      "avgHr": "Avg HR",
+      "maxHr": "Max HR",
+      "track": "Track",
+      "points": "{n} points",
+      "slow": "Slow",
+      "fast": "Fast",
+      "noTrackDesc": "No GPS track was recorded for this ride (the watch may not have fixed location, or it was indoors). Speed / heart-rate charts below are still available.",
+      "speed": "Speed",
+      "hr": "Heart Rate",
+      "altitude": "Elevation",
+      "recovery": "Recovery HR",
+      "recoverySub": "after exercise",
+      "emptyHr": "No heart-rate record for this ride",
+      "emptyAlt": "No elevation data for this ride",
+      "emptyRecovery": "No recovery heart-rate data for this ride",
+      "splits": "Splits",
+      "splitsSub": "{n} splits · median pace {pace}/km",
+      "splitKm": "Km {n}",
+      "notFound": "Ride not found",
+      "notFoundDesc": "The package may have changed. Go back to the ride list and pick again.",
+      "backToList": "Back to rides"
+    },
+    "data": {
+      "pickZip": "Choose ZIP",
+      "pickFolder": "Choose Folder",
+      "lan": {
+        "title": "Direct Upload (LAN)",
+        "receiving": "Receiving · port {port}",
+        "off": "Off",
+        "desc": "Install the “Samsung Health Viz Uploader” app on your phone, point it at the export folder from Samsung Health “Download personal data”, and the app packs it into a ZIP and uploads it to this computer — same Wi-Fi, no cable, no manual copying. The desktop app parses it automatically on arrival and refreshes the data.",
+        "starting": "Starting…",
+        "start": "Start receiving",
+        "firewallHint": "If the system asks about firewall permission the first time, allow “Samsung Health Viz” to access the local network.",
+        "address": "Computer address (enter this in the phone app)",
+        "token": "Token (6 digits)",
+        "status": "Status",
+        "stateOff": "Not started",
+        "stateReceiving": "Receiving phone upload…",
+        "stateParsing": "Received, parsing…",
+        "stateDone": "Imported",
+        "stateError": "Error: {error}",
+        "stateWaiting": "Waiting for phone upload",
+        "uploading": "Phone is uploading…",
+        "parsing": "Parsing…",
+        "received": "Received {bytes}",
+        "imported": "Imported {name} ({detail})",
+        "uploadedPackage": "phone upload",
+        "copyAddress": "Copy address",
+        "copyToken": "Copy token",
+        "newToken": "New token",
+        "openFolder": "Open receive folder",
+        "stop": "Stop",
+        "stopping": "Stopping…",
+        "altUrls": "If the first address fails, try:",
+        "uploadDir": "Receive folder",
+        "clearFiles": "Clear received files",
+        "step1": "Put the phone and computer on the same Wi-Fi; the phone app discovers this computer automatically, or enter the address above manually.",
+        "step2": "In the app, enter the token, pick the Samsung Health export folder and tap “Start upload”.",
+        "step3": "Keep this page open to watch progress; parsing and cache refresh happen automatically when done.",
+        "receivedMs": "receive {time}",
+        "parsedMs": "parse {time}",
+        "why": {
+          "bad-token": "Wrong token — check the 6-digit code shown on the computer",
+          "too-large": "File exceeds the 2 GiB limit",
+          "bad-file": "The upload is not a ZIP file",
+          "size-mismatch": "Received size does not match the declared size — the transfer may be truncated, please retry",
+          "checksum-mismatch": "Checksum mismatch — the transfer may be corrupted, please retry",
+          "busy": "The computer is still processing the previous package, try again later",
+          "too-many-attempts": "Too many failed attempts — wait a minute and retry"
+        }
+      },
+      "stadia": {
+        "title": "Basemap (Stadia Maps)",
+        "keySet": "Key configured",
+        "noKey": "No API key",
+        "desc": "The 9 Stadia Maps basemaps (Alidade / Outdoors / Stamen / OSM Bright) need an API key to load tiles; the desktop app cannot use localhost keyless access. Create a free account, generate a key in the console and paste it below; the key is stored on this machine only and never enters the repo or the installer.",
+        "changeKey": "Change key",
+        "enterKey": "Enter key",
+        "getKey": "Get a key",
+        "clearKey": "Clear key",
+        "hint": "The free plan excludes “Alidade Satellite” (requires Stadia Standard or above). If tiles.stadiamaps.com needs a proxy, make sure the system proxy is on (Electron follows the system proxy).",
+        "dialogTitle": "Stadia basemaps need an API key",
+        "dialogDesc": "Stadia Maps basemaps (Alidade / Outdoors / Stamen / OSM Bright) need an API key to load tiles on desktop. Create a free account, generate a key in the console and paste it below.",
+        "placeholder": "Paste Stadia API key",
+        "dialogHint": "The key is stored on this machine only.",
+        "openConsole": "Open Stadia console →",
+        "saveAndApply": "Save & apply"
+      },
+      "current": {
+        "title": "Current Package",
+        "ready": "Ready",
+        "notImported": "Not imported",
+        "notImportedDesc": "No package has been parsed yet: use “Direct upload” above, or click “Choose ZIP / Choose Folder” in the top right to import one. The parse result is cached locally and reopened on the next launch.",
+        "account": "Account (phone)",
+        "package": "Package",
+        "packageZip": "samsunghealth_*.zip",
+        "packageFolder": "Extracted folder",
+        "exportTime": "Exported at",
+        "generatedAt": "Parsed at",
+        "rides": "Rides",
+        "ridesValue": "{total} ({tracked} with tracks)",
+        "distanceDuration": "Distance / Duration",
+        "parseMs": "Parse time",
+        "sourcePath": "Package path",
+        "reveal": "Reveal",
+        "cachePath": "Local cache",
+        "clearCache": "Clear cache"
+      },
+      "parsed": {
+        "title": "What gets parsed",
+        "item1": "<b>com.samsung.shealth.exercise.csv</b>: filters exercise type <code>11007</code> (cycling) and reads start/end time, duration, distance, calories, elevation gain, avg/max heart rate and other summary fields.",
+        "item2": "<b>jsons/com.samsung.shealth.exercise/*/UUID.location_data.json</b>: per-second GPS points (lat/lon, altitude, time), downsampled and simplified with Douglas-Peucker into map tracks.",
+        "item3": "<b>jsons/.../UUID.live_data.json</b>: in-workout samples for the speed curve and per-km splits; estimated from distance deltas when missing.",
+        "item4": "<b>com.samsung.shealth.tracker.heart_rate.csv + binning_data.json</b>: when live_data has no heart rate, the minute-level HR buckets fill in the HR curve.",
+        "item5": "<b>exercise.weather / exercise.recovery_heart_rate</b>: weather and recovery HR joined by exercise_id.",
+        "warnings": "Parse warnings ({n})"
+      },
+      "notes": {
+        "title": "Notes & limits",
+        "item1": "This app parses read-only; it never modifies the original package and all data stays on this machine.",
+        "item2": "Cycling detection is based on the Samsung internal code <code>11007</code>; if your package uses a different code, the parser needs extending.",
+        "item3": "Map coordinates: the export has no explicit datum field, but phone-written track points carry <code>version</code> (GCJ-02) while watch tracks do not (WGS-84); parsing detects this and reprojects per basemap (AMAP GCJ-02 / OSM & satellite WGS-84) automatically.",
+        "item4": "This app only handles cycling; steps, sleep, heart rate and other data in the same package are out of scope."
+      }
+    },
+    "welcome": {
+      "title": "Put your Samsung Health data on the map",
+      "sub": "Import a data package exported from Samsung Health; rides and GPS tracks are parsed automatically into local maps and statistics.",
+      "dropTitle": "Drop your data package here",
+      "dropHint": "Supports <code>samsunghealth_*.zip</code> or an extracted folder",
+      "pickZip": "Choose ZIP package",
+      "pickFolder": "Choose extracted folder",
+      "lanLink": "Direct upload (LAN) →",
+      "lanHint": "No cable? Turn on receiving on the “Settings” page, install the uploader app from the repo on your phone, pick the export folder and upload in one tap.",
+      "step1": "In the Samsung Health phone app → Settings → Download personal data, get <code>samsunghealth_&lt;phone&gt;_&lt;time&gt;.zip</code>",
+      "step2": "Pick the ZIP here (or extract first and choose the folder); rides and tracks are parsed",
+      "step3": "When parsing finishes you land on the “Career” page; data is processed locally, and you can swap packages any time on the “Settings” page",
+      "privacy": "🔒 All parsing happens locally; the package is never uploaded. Parse results are cached in the app data directory."
+    },
+    "progress": {
+      "title": "Parsing package"
+    },
+    "toast": {
+      "reading": "Reading package…",
+      "parseFailed": "Parse failed",
+      "parsed": "Parsed {n} rides",
+      "parseFailedWith": "Parse failed: {error}",
+      "noStadiaKey": "No Stadia API key set; switched back to the default basemap",
+      "stadiaKeySaved": "Stadia API key saved; loading basemap",
+      "clearedKeyFallback": "Cleared the local key; falling back to the key from build config",
+      "clearedKey": "Cleared the locally saved Stadia key",
+      "cacheCleared": "Local cache cleared. Please pick a package again.",
+      "lanStarted": "Direct upload started: connect the phone and computer to the same Wi-Fi, then enter the address and token below",
+      "lanStartFailed": "Failed to start direct upload: {error}",
+      "tokenRegenerated": "New token generated",
+      "copied": "Copied: {text}",
+      "lanParsing": "Parsing phone upload…",
+      "lanParsed": "Received phone upload: {n} rides",
+      "lanParsedPlain": "Received phone upload",
+      "lanParseFailed": "Failed to parse the phone upload: {error}",
+      "lanUploadRejected": "Phone upload failed: {error}",
+      "lanReceiveError": "Receive error: {error}",
+      "uploadRejected": "Upload rejected",
+      "receiveError": "Receive error",
+      "parseErrorPlain": "Parse failed",
+      "tileErrorKeyed": "Basemap failed to load: check that the Stadia API key is valid and your plan supports this basemap",
+      "tileError": "Basemap failed to load — check your network and retry later"
+    },
+    "map": {
+      "fullscreen": "View fullscreen",
+      "exitFullscreen": "Exit fullscreen (Esc)",
+      "avgSpeed": "avg"
+    },
+    "format": {
+      "date": "{mon} {d}, {y}",
+      "monthTitle": "{mon} {y}",
+      "weekday": "{name}",
+      "weekdays": {
+        "0": "Sun",
+        "1": "Mon",
+        "2": "Tue",
+        "3": "Wed",
+        "4": "Thu",
+        "5": "Fri",
+        "6": "Sat"
+      },
+      "duration": {
+        "hm": "{h} h {m} min",
+        "h": "{h} h",
+        "ms": "{m} min {s} s",
+        "m": "{m} min",
+        "s": "{s} s"
+      }
+    }
+  },
+  "main": {
+    "dialog": {
+      "pickZip": "Choose the ZIP package exported from Samsung Health",
+      "pickZipFilter": "Samsung Health package",
+      "pickFolder": "Choose the extracted package folder"
+    },
+    "window": {
+      "settings": "Settings"
+    },
+    "progress": {
+      "reading": "Reading package…",
+      "parsing": "Parsing workouts…",
+      "writing": "Writing cache…",
+      "done": "Done"
+    },
+    "error": {
+      "pathMissing": "Path does not exist: {path}",
+      "badPackageType": "Please choose a .zip package or an extracted folder",
+      "noRides": "No cycling workouts found in the package (exercise_type = 11007)",
+      "badTheme": "Invalid theme mode",
+      "badLocale": "Invalid locale"
+    },
+    "lan": {
+      "startFailed": "Failed to start the LAN receiver: {error}",
+      "notStarted": "Receiver is not running"
+    },
+    "update": {
+      "newVersion": {
+        "title": "Update Available",
+        "message": "Samsung Health Viz {version} has been released",
+        "detail": "Auto-install is not available on macOS yet (the app is unsigned). Open the release page to download the installer manually."
+      },
+      "ready": {
+        "title": "Update Ready",
+        "message": "Samsung Health Viz {version} has been downloaded",
+        "detail": "Restart the app to install the new version."
+      },
+      "latest": {
+        "title": "Up to Date",
+        "message": "Version {version} is the latest"
+      },
+      "failed": {
+        "title": "Update Check Failed",
+        "message": "Unable to check for updates right now"
+      },
+      "dev": {
+        "title": "Development Mode",
+        "message": "Update checks are disabled in development mode",
+        "detail": "Update checks only run in a packaged build via GitHub Releases."
+      }
+    },
+    "button": {
+      "openRelease": "Open release page",
+      "later": "Later",
+      "restartNow": "Restart now",
+      "ok": "OK",
+      "close": "Close"
+    }
+  }
+}
