@@ -1,0 +1,438 @@
+{
+  "meta": {
+    "name": "中文",
+    "htmlLang": "zh-CN"
+  },
+  "ui": {
+    "common": {
+      "all": "全部",
+      "cancel": "取消",
+      "noData": "暂无数据",
+      "yes": "有",
+      "no": "无",
+      "min": "分钟"
+    },
+    "settings": {
+      "title": "设置",
+      "groupApp": "设置",
+      "groupAbout": "关于",
+      "navGeneral": "通用",
+      "navMap": "地图",
+      "navData": "数据",
+      "generalSubtitle": "主题与语言",
+      "mapSubtitle": "底图行为与 Stadia API Key",
+      "dataSubtitle": "数据包导入与手机直传",
+      "aboutSubtitle": "版本、更新与解析说明",
+      "appearance": "外观与语言",
+      "theme": "主题",
+      "language": "语言",
+      "followTheme": "底图跟随主题",
+      "followThemeDesc": "开启后，明暗主题变化时自动在成对底图间切换（高德 · 暗色/标准、Stadia Alidade Smooth Dark/Smooth）。手动选择底图会关闭此开关。",
+      "followThemeNoPair": "当前底图「{style}」没有明暗版本，跟随主题不会改变它。",
+      "on": "开启",
+      "off": "关闭",
+      "about": "关于",
+      "version": "版本",
+      "updates": "更新",
+      "checkUpdates": "检查更新",
+      "checking": "检查中…",
+      "openRelease": "打开发布页",
+      "build": "构建",
+      "buildInfo": "Electron {electron} · Chrome {chrome}",
+      "mode": {
+        "system": "跟随系统",
+        "dark": "深色",
+        "light": "浅色"
+      }
+    },
+    "nav": {
+      "career": "生涯",
+      "rides": "骑行记录"
+    },
+    "brand": {
+      "name": "三星健康可视化",
+      "sub": "Samsung Health Viz · Cycling"
+    },
+    "titlebar": {
+      "sourceChip": "数据包 · 账号 {name}",
+      "exported": "{date} 导出",
+      "localPackage": "本地数据包"
+    },
+    "mapStyle": {
+      "amap-dark": "高德 · 暗色",
+      "amap": "高德 · 标准",
+      "amap-sat": "高德 · 卫星",
+      "alidade-smooth": "Stadia · Alidade Smooth",
+      "alidade-smooth-dark": "Stadia · Alidade Smooth Dark",
+      "alidade-bright": "Stadia · Alidade Bright",
+      "alidade-satellite": "Stadia · Alidade Satellite",
+      "outdoors": "Stadia · Outdoors",
+      "stamen-toner": "Stadia · Stamen Toner",
+      "stamen-terrain": "Stadia · Stamen Terrain",
+      "stamen-watercolor": "Stadia · Stamen Watercolor",
+      "osm-bright": "Stadia · OSM Bright",
+      "satellite": "卫星影像",
+      "osm": "OpenStreetMap",
+      "plain": "无底图"
+    },
+    "month": {
+      "1": "1月",
+      "2": "2月",
+      "3": "3月",
+      "4": "4月",
+      "5": "5月",
+      "6": "6月",
+      "7": "7月",
+      "8": "8月",
+      "9": "9月",
+      "10": "10月",
+      "11": "11月",
+      "12": "12月"
+    },
+    "weather": {
+      "clear": "晴",
+      "partlyCloudy": "多云",
+      "cloudy": "阴",
+      "lightRain": "小雨",
+      "rain": "中雨",
+      "heavyRain": "大雨",
+      "thunderstorm": "雷阵雨",
+      "sleet": "雨夹雪",
+      "lightSnow": "小雪",
+      "snow": "中雪",
+      "heavySnow": "大雪",
+      "fog": "雾",
+      "mist": "薄雾",
+      "haze": "霾",
+      "windy": "大风"
+    },
+    "career": {
+      "title": "骑行生涯",
+      "subtitle": "{range} · {count} 次骑行 · {tracks} 条轨迹 · 平均 {speed}",
+      "subtitle_one": "{range} · 1 次骑行 · {tracks} 条轨迹 · 平均 {speed}",
+      "totalDistance": "总里程",
+      "ridesCount": "{n} 次骑行",
+      "ridesCount_one": "1 次骑行",
+      "totalTime": "总时长",
+      "totalTimeSub": "含所有骑行记录",
+      "totalGain": "累计爬升",
+      "totalGainSub": "三星估算 / GPS 海拔",
+      "totalCalories": "总消耗",
+      "avgSpeed": "平均速度",
+      "withTrack": "有轨迹",
+      "withTrackSub": "可绘制到地图",
+      "routes": "骑行路线",
+      "tracksCount": "{label} · {n} 条轨迹",
+      "dimBasemap": "底图淡化",
+      "dimBasemapTip": "底图淡化：调高后底图更淡，轨迹更突出",
+      "allAreas": "全部区域",
+      "area": "区域 {n}",
+      "mapFootHint": "悬停查看摘要 · 点击进入单次骑行",
+      "byYear": "按年份",
+      "distancePerKm": "里程 / km",
+      "personalBests": "个人最佳",
+      "calendar": "骑行日历",
+      "calendarHint": "颜色越深，当月里程越多",
+      "recent": "最近骑行",
+      "allRecords": "全部记录 →",
+      "noTrackData": "本数据包暂无 GPS 轨迹，地图无法绘制"
+    },
+    "pb": {
+      "distance": "最长单次距离",
+      "duration": "最长骑行时间",
+      "speed": "最快平均速度",
+      "climb": "最大累计爬升",
+      "calories": "单次最大消耗"
+    },
+    "heatmap": {
+      "more": "多",
+      "less": "少",
+      "tipTitle": "{title}",
+      "noRides": "没有骑行",
+      "tip": "{km} km · {n} 次"
+    },
+    "rides": {
+      "title": "骑行记录",
+      "subtitle": "共 {total} 条骑行记录，其中 {tracked} 条带 GPS 轨迹",
+      "subtitle_one": "共 1 条骑行记录，其中 {tracked} 条带 GPS 轨迹",
+      "allYears": "全部年份",
+      "sortDateDesc": "按时间（新→旧）",
+      "sortDateAsc": "按时间（旧→新）",
+      "sortDist": "按距离",
+      "sortDur": "按时长",
+      "thDate": "日期",
+      "thDistance": "距离",
+      "thDuration": "时长",
+      "thAvgSpeed": "均速",
+      "thGain": "爬升",
+      "thAvgHr": "均心率",
+      "thWeather": "天气",
+      "thTrack": "轨迹",
+      "empty": "没有符合条件的骑行记录"
+    },
+    "detail": {
+      "back": "← 返回记录",
+      "noTrack": "无 GPS 轨迹",
+      "humidityWind": "湿度 {humidity}% · 风速 {wind} {unit}",
+      "distance": "距离",
+      "duration": "时长",
+      "avgSpeed": "平均速度",
+      "maxSpeed": "最高速度",
+      "gain": "累计爬升",
+      "loss": "累计下降",
+      "calories": "消耗",
+      "avgHr": "平均心率",
+      "maxHr": "最高心率",
+      "track": "轨迹",
+      "points": "{n} 个点",
+      "slow": "慢",
+      "fast": "快",
+      "noTrackDesc": "这次骑行没有记录 GPS 轨迹（可能手表未定位或为室内骑行），下方仍有速度/心率数据。",
+      "speed": "速度",
+      "hr": "心率",
+      "altitude": "海拔",
+      "recovery": "恢复心率",
+      "recoverySub": "运动后",
+      "emptyHr": "这次骑行没有心率记录",
+      "emptyAlt": "这次骑行没有海拔数据",
+      "emptyRecovery": "该次骑行没有恢复心率数据",
+      "splits": "分段配速",
+      "splitsSub": "共 {n} 段 · 中位配速 {pace}/km",
+      "splitKm": "第 {n} km",
+      "notFound": "没有找到这次骑行",
+      "notFoundDesc": "可能是数据包已更换，返回记录列表重新选择。",
+      "backToList": "返回记录"
+    },
+    "data": {
+      "pickZip": "选择 ZIP",
+      "pickFolder": "选择文件夹",
+      "lan": {
+        "title": "手机直传（局域网）",
+        "receiving": "接收中 · 端口 {port}",
+        "off": "未开启",
+        "desc": "在手机装上「Samsung Health Viz 直传」App，选中三星健康「下载个人数据」得到的导出目录，App 会自动打包成 ZIP 并上传到这台电脑——同一 Wi-Fi、不用数据线、不用手动拷文件。电脑端收到后自动解析并刷新数据。",
+        "starting": "正在启动…",
+        "start": "开启接收",
+        "firewallHint": "首次开启若系统询问防火墙权限，请允许「Samsung Health Viz」访问局域网。",
+        "address": "电脑地址（手机 App 里填这个）",
+        "token": "令牌（6 位数字）",
+        "status": "状态",
+        "stateOff": "未开启",
+        "stateReceiving": "正在接收手机上传…",
+        "stateParsing": "已收到，正在解析…",
+        "stateDone": "已导入",
+        "stateError": "出错：{error}",
+        "stateWaiting": "等待手机上传",
+        "uploading": "手机正在上传…",
+        "parsing": "解析中…",
+        "received": "已接收 {bytes}",
+        "imported": "已导入 {name}（{detail}）",
+        "uploadedPackage": "手机上传的数据包",
+        "copyAddress": "复制地址",
+        "copyToken": "复制令牌",
+        "newToken": "换一个令牌",
+        "openFolder": "打开接收目录",
+        "stop": "停止接收",
+        "stopping": "正在停止…",
+        "altUrls": "如果第一个地址连不上，换用：",
+        "uploadDir": "接收目录",
+        "clearFiles": "清除已接收文件",
+        "step1": "手机与电脑连同一个 Wi-Fi；手机 App 会自动发现这台电脑，也可以用上面地址手动填。",
+        "step2": "在 App 里输入令牌，选择三星健康导出目录，点「开始上传」。",
+        "step3": "保持本页打开即可看到接收进度，完成后自动解析并更新缓存。",
+        "receivedMs": "接收 {time}",
+        "parsedMs": "解析 {time}",
+        "why": {
+          "bad-token": "令牌不对，请对照电脑端显示的 6 位数字",
+          "too-large": "文件超过 2 GiB 上限",
+          "bad-file": "收到的不是 ZIP 文件",
+          "size-mismatch": "收到的文件大小与声明不符，传输可能被截断，请重试",
+          "checksum-mismatch": "文件校验不通过，传输可能损坏，请重试",
+          "busy": "电脑端正在处理上一份数据，请稍后再试",
+          "too-many-attempts": "失败次数过多，等待一分钟后重试"
+        }
+      },
+      "stadia": {
+        "title": "地图底图（Stadia Maps）",
+        "keySet": "已配置 Key",
+        "noKey": "未配置 Key",
+        "desc": "Stadia Maps 的 9 款底图（Alidade / Outdoors / Stamen / OSM Bright）需要 API Key 才能加载瓦片，桌面端不能走 localhost 免鉴权。注册免费账号后在控制台生成 Key，粘贴进来即可；Key 只保存在本机，不会写入仓库或安装包。",
+        "changeKey": "更换 Key",
+        "enterKey": "填写 Key",
+        "getKey": "获取 Key",
+        "clearKey": "清除 Key",
+        "hint": "免费 Key 不含「Alidade Satellite」（需 Stadia Standard 及以上）；访问 tiles.stadiamaps.com 需要代理时，请确保系统代理已开启（Electron 会跟随系统代理）。",
+        "dialogTitle": "Stadia 底图需要 API Key",
+        "dialogDesc": "Stadia Maps 的底图（Alidade / Outdoors / Stamen / OSM Bright）桌面端需要 API Key 才能加载瓦片。注册免费账号后在控制台生成 Key，粘贴到下面即可。",
+        "placeholder": "粘贴 Stadia API Key",
+        "dialogHint": "Key 只保存在本机，不会写入仓库或安装包。",
+        "openConsole": "打开 Stadia 控制台 →",
+        "saveAndApply": "保存并应用"
+      },
+      "current": {
+        "title": "当前数据包",
+        "ready": "已就绪",
+        "notImported": "尚未导入",
+        "notImportedDesc": "还没有解析过数据包：可以用上方「手机直传」，或者点右上角「选择 ZIP / 选择文件夹」导入一次。解析结果缓存在本机，之后启动会直接打开。",
+        "account": "账号（手机号）",
+        "package": "数据包",
+        "packageZip": "samsunghealth_*.zip",
+        "packageFolder": "解压文件夹",
+        "exportTime": "导出时间",
+        "generatedAt": "解析时间",
+        "rides": "骑行记录",
+        "ridesValue": "{total} 条（{tracked} 条含轨迹）",
+        "distanceDuration": "总里程 / 总时长",
+        "parseMs": "解析耗时",
+        "sourcePath": "数据包路径",
+        "reveal": "打开位置",
+        "cachePath": "本地缓存",
+        "clearCache": "清除缓存"
+      },
+      "parsed": {
+        "title": "解析了什么",
+        "item1": "<b>com.samsung.shealth.exercise.csv</b>：筛选运动类型 <code>11007</code>（骑行），读取起止时间、时长、距离、热量、爬升、平均/最大心率等汇总字段。",
+        "item2": "<b>jsons/com.samsung.shealth.exercise/*/UUID.location_data.json</b>：逐秒 GPS 点（经纬度、海拔、时间），经抽稀与 Douglas-Peucker 简化后作为地图轨迹。",
+        "item3": "<b>jsons/.../UUID.live_data.json</b>：运动过程采样，用于速度曲线与每公里分段；缺少时用距离增量估算。",
+        "item4": "<b>com.samsung.shealth.tracker.heart_rate.csv + binning_data.json</b>：当 live_data 没有心率时，用分钟级心率桶补齐心率曲线。",
+        "item5": "<b>exercise.weather / exercise.recovery_heart_rate</b>：按 exercise_id 关联天气与恢复心率。",
+        "warnings": "解析警告（{n}）"
+      },
+      "notes": {
+        "title": "说明与边界",
+        "item1": "本应用只读解析，不会修改原始数据包；所有数据留在本机。",
+        "item2": "骑行类型判定基于三星内部编码 <code>11007</code>，若你的数据包中骑行使用了其他编码，需要在解析层扩展。",
+        "item3": "地图坐标系：导出包没有显式基准字段，但手机写入的轨迹点带 <code>version</code>（GCJ-02），手表轨迹不带（WGS-84）；解析时按此判断，并按底图（高德 GCJ-02 / OSM·卫星 WGS-84）自动换算，无需手动处理。",
+        "item4": "本应用只处理骑行数据；同一数据包里的步数、睡眠、心率等数据不在范围内。"
+      }
+    },
+    "welcome": {
+      "title": "把三星健康数据画在地图上",
+      "sub": "导入三星健康（Samsung Health）导出的数据包，自动解析骑行记录与 GPS 轨迹，生成本地地图与统计。",
+      "dropTitle": "拖拽数据包到这里",
+      "dropHint": "支持 <code>samsunghealth_*.zip</code> 或解压后的文件夹",
+      "pickZip": "选择 ZIP 数据包",
+      "pickFolder": "选择解压文件夹",
+      "lanLink": "手机直传（局域网）→",
+      "lanHint": "不想插数据线？在「设置」页开启接收，手机装仓库里的直传 App 选中导出目录即可一键打包上传。",
+      "step1": "手机三星健康 App → 设置 → 下载个人数据，得到 <code>samsunghealth_&lt;手机号&gt;_&lt;时间&gt;.zip</code>",
+      "step2": "在这里选择该 ZIP（或先解压后选择文件夹），解析出骑行记录与轨迹",
+      "step3": "解析完成后进入「生涯」页；数据只在本机处理，可随时在「设置」页更换数据包",
+      "privacy": "🔒 所有解析都在本机完成，数据包不会上传；解析结果缓存在应用数据目录。"
+    },
+    "progress": {
+      "title": "正在解析数据包"
+    },
+    "toast": {
+      "reading": "读取数据包…",
+      "parseFailed": "解析失败",
+      "parsed": "已解析 {n} 条骑行记录",
+      "parseFailedWith": "解析失败：{error}",
+      "noStadiaKey": "未填写 Stadia API Key，已切回默认底图",
+      "stadiaKeySaved": "Stadia API Key 已保存，正在加载底图",
+      "clearedKeyFallback": "已清除本机 Key，回退到构建配置的 Key",
+      "clearedKey": "已清除本机保存的 Stadia Key",
+      "cacheCleared": "已清除本地缓存，请重新选择数据包",
+      "lanStarted": "手机直传已开启：手机与电脑连同一 Wi-Fi，输入下方地址和令牌",
+      "lanStartFailed": "开启手机直传失败：{error}",
+      "tokenRegenerated": "已生成新的令牌",
+      "copied": "已复制：{text}",
+      "lanParsing": "解析手机上传的数据包…",
+      "lanParsed": "已接收手机上传的数据包：{n} 条骑行记录",
+      "lanParsedPlain": "已接收手机上传的数据包",
+      "lanParseFailed": "解析手机上传的数据包失败：{error}",
+      "lanUploadRejected": "手机上传失败：{error}",
+      "lanReceiveError": "接收出错：{error}",
+      "uploadRejected": "上传被拒绝",
+      "receiveError": "接收出错",
+      "parseErrorPlain": "解析失败",
+      "tileErrorKeyed": "底图加载失败：请检查 Stadia API Key 是否有效，或套餐/额度是否支持该底图",
+      "tileError": "底图加载失败，请检查网络或稍后重试"
+    },
+    "map": {
+      "fullscreen": "全屏查看",
+      "exitFullscreen": "退出全屏（Esc）",
+      "avgSpeed": "均速"
+    },
+    "format": {
+      "date": "{y} 年 {m} 月 {d} 日",
+      "monthTitle": "{y} 年 {m} 月",
+      "weekday": "周{name}",
+      "weekdays": {
+        "0": "日",
+        "1": "一",
+        "2": "二",
+        "3": "三",
+        "4": "四",
+        "5": "五",
+        "6": "六"
+      },
+      "duration": {
+        "hm": "{h} 小时 {m} 分",
+        "h": "{h} 小时",
+        "ms": "{m} 分 {s} 秒",
+        "m": "{m} 分",
+        "s": "{s} 秒"
+      }
+    }
+  },
+  "main": {
+    "dialog": {
+      "pickZip": "选择三星健康导出的 ZIP 数据包",
+      "pickZipFilter": "Samsung Health 数据包",
+      "pickFolder": "选择解压后的数据包文件夹"
+    },
+    "window": {
+      "settings": "设置"
+    },
+    "progress": {
+      "reading": "读取数据包…",
+      "parsing": "解析运动记录…",
+      "writing": "写入缓存…",
+      "done": "完成"
+    },
+    "error": {
+      "pathMissing": "路径不存在：{path}",
+      "badPackageType": "请选择 .zip 数据包或解压后的文件夹",
+      "noRides": "数据包里没有找到骑行记录（exercise_type = 11007）",
+      "badTheme": "无效的主题模式",
+      "badLocale": "无效的语言代码"
+    },
+    "lan": {
+      "startFailed": "局域网接收器启动失败：{error}",
+      "notStarted": "接收器未启动"
+    },
+    "update": {
+      "newVersion": {
+        "title": "发现新版本",
+        "message": "Samsung Health Viz {version} 已发布",
+        "detail": "macOS 版暂不支持自动安装（应用未签名），请打开发布页手动下载安装包。"
+      },
+      "ready": {
+        "title": "更新已就绪",
+        "message": "Samsung Health Viz {version} 已下载",
+        "detail": "重启应用后自动安装新版本。"
+      },
+      "latest": {
+        "title": "已是最新版本",
+        "message": "当前版本 {version} 已是最新"
+      },
+      "failed": {
+        "title": "检查更新失败",
+        "message": "暂时无法检查更新"
+      },
+      "dev": {
+        "title": "开发模式",
+        "message": "开发模式下不检查更新",
+        "detail": "用构建后的安装包运行时才会检查 GitHub Release。"
+      }
+    },
+    "button": {
+      "openRelease": "打开发布页",
+      "later": "稍后",
+      "restartNow": "立即重启",
+      "ok": "好",
+      "close": "关闭"
+    }
+  }
+}

@@ -12,6 +12,14 @@ const ROOT_PREFIX_RE = /^[^/]+\//;
 /** 数据集结构版本：增加字段时 +1，旧缓存会被忽略并要求重新选择数据包 */
 export const SCHEMA = 4;
 
+/**
+ * 用户可见文案（进度 / 警告 / 错误）按 locale 输出。
+ * 本模块被主进程与 scripts/ 直接调用，默认中文，`en` 时输出英文。
+ */
+function msg(locale, zh, en) {
+  return locale === 'en' ? en : zh;
+}
+
 export function folderReader(root) {
   const files = [];
   const walk = (dir, base) => {
@@ -277,9 +285,18 @@ function jsonPath(typeDir, name) {
 export function buildCyclingDataset(reader, opts = {}) {
   const t0 = Date.now();
   const warnings = [];
+  const locale = opts.locale === 'en' ? 'en' : 'zh';
 
   const exFile = findCsv(reader, T.exercise);
-  if (!exFile) throw new Error('这个目录/压缩包里找不到 com.samsung.shealth.exercise.*.csv，可能不是三星健康导出包');
+  if (!exFile) {
+    throw new Error(
+      msg(
+        locale,
+        '这个目录/压缩包里找不到 com.samsung.shealth.exercise.*.csv，可能不是三星健康导出包',
+        'No com.samsung.shealth.exercise.*.csv found in this folder/archive — it may not be a Samsung Health export'
+      )
+    );
+  }
   const ex = parseSamsungCsv(reader.readText(exFile));
 
   // 坐标基准判定逻辑集中在 core/coord-sys.mjs（含实测依据、判定顺序与修改指引）
@@ -332,13 +349,25 @@ export function buildCyclingDataset(reader, opts = {}) {
 
   const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
   const cyclingRecs = ex.records.filter((rec) => String(pick(rec, 'exercise_type') || '') === '11007');
-  if (onProgress) onProgress(`找到 ${cyclingRecs.length} 条骑行记录`, 10);
+  if (onProgress) {
+    onProgress(
+      msg(locale, `找到 ${cyclingRecs.length} 条骑行记录`, `Found ${cyclingRecs.length} cycling ride${cyclingRecs.length === 1 ? '' : 's'}`),
+      10
+    );
+  }
 
   const rides = [];
   for (let ri = 0; ri < cyclingRecs.length; ri++) {
     const rec = cyclingRecs[ri];
     if (onProgress && (ri % 2 === 0 || ri === cyclingRecs.length - 1)) {
-      onProgress(`解析轨迹与心率 ${ri + 1}/${cyclingRecs.length}`, 12 + Math.round((80 * ri) / Math.max(1, cyclingRecs.length)));
+      onProgress(
+        msg(
+          locale,
+          `解析轨迹与心率 ${ri + 1}/${cyclingRecs.length}`,
+          `Parsing tracks and heart rate ${ri + 1}/${cyclingRecs.length}`
+        ),
+        12 + Math.round((80 * ri) / Math.max(1, cyclingRecs.length))
+      );
     }
     const id = pick(rec, 'datauuid');
     const deviceuuid = pick(rec, 'deviceuuid');
@@ -401,7 +430,7 @@ export function buildCyclingDataset(reader, opts = {}) {
           if (simplified.length >= 2) track = { pts: simplified };
         }
       } catch (e) {
-        warnings.push(`轨迹读取失败 ${id}: ${e.message}`);
+        warnings.push(msg(locale, `轨迹读取失败 ${id}: ${e.message}`, `Failed to read track ${id}: ${e.message}`));
       }
     }
 
@@ -428,7 +457,9 @@ export function buildCyclingDataset(reader, opts = {}) {
           }
         }
       } catch (e) {
-        warnings.push(`运动采样读取失败 ${id}: ${e.message}`);
+        warnings.push(
+          msg(locale, `运动采样读取失败 ${id}: ${e.message}`, `Failed to read workout samples ${id}: ${e.message}`)
+        );
       }
     }
 
@@ -576,7 +607,7 @@ export function buildCyclingDataset(reader, opts = {}) {
   }
 
   rides.sort((a, b) => a.startMs - b.startMs);
-  if (onProgress) onProgress('汇总生涯数据…', 94);
+  if (onProgress) onProgress(msg(locale, '汇总生涯数据…', 'Summarizing career stats…'), 94);
 
   const name = detectPackageName(reader.label);
   const meta = {

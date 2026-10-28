@@ -3,6 +3,8 @@ import { onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import L from 'leaflet';
 import { makeMap, projectPoint, createTileLayers, tileOpacity, requiresStadiaKey } from '../lib/leaflet.js';
 import { showToast } from '../store.js';
+import { i18n, t } from '../lib/i18n.js';
+import { chartColors } from '../lib/palette.js';
 
 const props = defineProps({
   mode: { type: String, default: 'career' }, // career | detail
@@ -39,6 +41,21 @@ const ICON_COMPRESS =
 let fsBtn = null;
 let isFullscreen = false;
 
+let lastSize = null;
+let resizeTimer = null;
+
+/**
+ * 容器尺寸变化（全屏切换 / 窗口缩放）后重新初始化视野：
+ * 先 invalidateSize 让 Leaflet 重新测量，再按轨迹范围 fitBounds，避免地图停在旧视野/半空区域。
+ */
+function refitView() {
+  if (!map) return;
+  map.invalidateSize({ animate: false });
+  if (props.fit && fitPoints.length) {
+    map.fitBounds(L.latLngBounds(fitPoints), { padding: [26, 26] });
+  }
+}
+
 function setFullscreen(on) {
   if (on === isFullscreen) return;
   const card = el.value?.closest('.map-card');
@@ -52,14 +69,17 @@ function setFullscreen(on) {
 
   if (fsBtn) {
     fsBtn.innerHTML = on ? ICON_COMPRESS : ICON_EXPAND;
-    fsBtn.title = on ? '退出全屏（Esc）' : '全屏查看';
+    fsBtn.title = on ? t('map.exitFullscreen') : t('map.fullscreen');
     fsBtn.setAttribute('aria-label', fsBtn.title);
     fsBtn.setAttribute('aria-pressed', String(on));
     fsBtn.classList.toggle('active', on);
   }
-  // 容器尺寸变了：立即同步一次，再等下一帧布局落定后补一次
+  // 容器尺寸变了：立即同步一次，再等布局落定后重新算一次缩放/位置
   map?.invalidateSize({ animate: false });
-  requestAnimationFrame(() => map?.invalidateSize({ animate: false }));
+  requestAnimationFrame(() => refitView());
+  // 全屏类名/滚动锁定的布局可能晚一帧生效，兜底再对齐一次
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(refitView, 120);
 }
 
 function onKeydown(e) {
@@ -73,8 +93,8 @@ function createFullscreenControl() {
       const box = L.DomUtil.create('div', 'leaflet-bar map-fs-control');
       fsBtn = L.DomUtil.create('button', 'map-fs-toggle', box);
       fsBtn.type = 'button';
-      fsBtn.title = '全屏查看';
-      fsBtn.setAttribute('aria-label', '全屏查看');
+      fsBtn.title = t('map.fullscreen');
+      fsBtn.setAttribute('aria-label', t('map.fullscreen'));
       fsBtn.setAttribute('aria-pressed', 'false');
       fsBtn.innerHTML = ICON_EXPAND;
       L.DomEvent.disableClickPropagation(box);
@@ -94,10 +114,17 @@ function toLatLng(p, coordSys) {
   return [lat, lon];
 }
 
-const CASING = { color: '#05080e', opacity: 0.55, lineCap: 'round', lineJoin: 'round', interactive: false };
-
-function draw() {
+function draw({ fit = true } = {}) {
   if (!map) return;
+  const c = chartColors();
+  // 路线描边跟随主题：深色底近黑描边，浅色底白色描边（避免彩色轨迹在浅底上显得脏/糊）
+  const casing = {
+    color: c.routeCasing.color,
+    opacity: c.routeCasing.opacity,
+    lineCap: 'round',
+    lineJoin: 'round',
+    interactive: false,
+  };
   routeLayer.clearLayers();
   fitPoints.length = 0;
 
@@ -116,7 +143,7 @@ function draw() {
       fitPoints.push(...it.latlngs);
       routeLayer.addLayer(
         L.polyline(it.latlngs, {
-          ...CASING,
+          ...casing,
           weight: (it.t.weight ?? 4) + 5,
         })
       );
@@ -157,7 +184,7 @@ function draw() {
     if (all.length > 1) {
       const latlngs = all.map((p) => toLatLng(p, props.coordSys));
       fitPoints.push(...latlngs);
-      routeLayer.addLayer(L.polyline(latlngs, { ...CASING, weight: 10, opacity: 0.5 }));
+      routeLayer.addLayer(L.polyline(latlngs, { ...casing, weight: 10 }));
     }
     // 按速度着色的分段
     for (const seg of props.segments) {
@@ -175,16 +202,29 @@ function draw() {
       const first = props.segments[0].latlngs[0];
       const lastSeg = props.segments[props.segments.length - 1];
       const last = lastSeg.latlngs[lastSeg.latlngs.length - 1];
+      // 起终点标记的描边/填充随主题变化（浅色底图上白描边会消失，改用 markers.border）
       routeLayer.addLayer(
-        L.circleMarker(toLatLng(first, props.coordSys), { radius: 6, color: '#fff', weight: 2, fillColor: '#22c55e', fillOpacity: 1 })
+        L.circleMarker(toLatLng(first, props.coordSys), {
+          radius: 6,
+          color: c.markers.border,
+          weight: 2,
+          fillColor: c.markers.start,
+          fillOpacity: 1,
+        })
       );
       routeLayer.addLayer(
-        L.circleMarker(toLatLng(last, props.coordSys), { radius: 6, color: '#fff', weight: 2, fillColor: '#ef4444', fillOpacity: 1 })
+        L.circleMarker(toLatLng(last, props.coordSys), {
+          radius: 6,
+          color: c.markers.border,
+          weight: 2,
+          fillColor: c.markers.end,
+          fillOpacity: 1,
+        })
       );
     }
   }
 
-  if (props.fit && fitPoints.length) {
+  if (props.fit && fit && fitPoints.length) {
     map.fitBounds(L.latLngBounds(fitPoints), { padding: [26, 26] });
   }
 }
@@ -229,23 +269,56 @@ function onTileError() {
   if (tileErrorShown) return;
   tileErrorShown = true;
   const keyed = requiresStadiaKey(props.mapStyle);
-  showToast(
-    keyed
-      ? '底图加载失败：请检查 Stadia API Key 是否有效，或套餐/额度是否支持该底图'
-      : '底图加载失败，请检查网络或稍后重试',
-    'error',
-    5200
-  );
+  showToast(keyed ? t('toast.tileErrorKeyed') : t('toast.tileError'), 'error', 5200);
 }
+
+/* 轨迹几何指纹：只有轨迹本身变化（换数据/年份/区域/单次骑行）才重新 fitBounds。
+ * 主题与语言切换也会让 tracks/segments 重新计算（年份色、tooltip 文案跟着变），
+ * 那种情况只需要重绘颜色，不应重置用户当前的缩放/平移。 */
+function pointKey(p) {
+  return p ? `${p[0].toFixed(4)},${p[1].toFixed(4)}` : '';
+}
+function fitSignature() {
+  if (props.mode === 'career') {
+    return (
+      'career:' +
+      props.tracks
+        .map(
+          (t) =>
+            `${t.id}:${t.points.length}:${t.coordSys || 'wgs84'}:${pointKey(t.points[0])}:${pointKey(t.points[t.points.length - 1])}`
+        )
+        .join('|')
+    );
+  }
+  const segs = props.segments;
+  const lastSeg = segs[segs.length - 1];
+  const last = lastSeg?.latlngs?.[lastSeg.latlngs.length - 1];
+  return `detail:${segs.length}:${segs.reduce((n, s) => n + s.latlngs.length, 0)}:${pointKey(segs[0]?.latlngs?.[0])}:${pointKey(last)}`;
+}
+let lastFitSig = null;
 
 onMounted(() => {
   map = makeMap(el.value);
   routeLayer = L.layerGroup().addTo(map);
   refreshTiles();
   draw();
+  lastFitSig = fitSignature();
   createFullscreenControl().addTo(map);
   window.addEventListener('keydown', onKeydown);
-  ro = new ResizeObserver(() => map && map.invalidateSize());
+  const initial = el.value.getBoundingClientRect();
+  lastSize = { w: initial.width, h: initial.height };
+  ro = new ResizeObserver(() => {
+    if (!map || !el.value) return;
+    const r = el.value.getBoundingClientRect();
+    if (!lastSize) {
+      lastSize = { w: r.width, h: r.height };
+      return;
+    }
+    if (Math.abs(r.width - lastSize.w) < 2 && Math.abs(r.height - lastSize.h) < 2) return;
+    lastSize = { w: r.width, h: r.height };
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(refitView, 140);
+  });
   ro.observe(el.value);
 });
 
@@ -253,6 +326,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown);
   setFullscreen(false); // 离开页面（含全屏时点击轨迹跳转）要还原类名与滚动锁定
   ro?.disconnect();
+  clearTimeout(resizeTimer);
   map?.remove();
   map = null;
   fsBtn = null;
@@ -260,13 +334,20 @@ onBeforeUnmount(() => {
 
 watch(
   () => [props.tracks, props.segments, props.mode],
-  () => draw()
+  () => {
+    const sig = fitSignature();
+    const geometryChanged = sig !== lastFitSig;
+    lastFitSig = sig;
+    draw({ fit: geometryChanged });
+  }
 );
 watch(
   () => props.mapStyle,
   () => {
-    // 底图切换后重建瓦片图层（坐标均为 WGS-84，轨迹无需重投影）
-    draw();
+    // 底图决定坐标投影：高德瓦片是 GCJ-02，OSM/Stadia 是 WGS-84，同一条轨迹在两种底图上
+    // 需要不同的偏移修正。所以换底图必须重绘轨迹，但不能重设视野（保留用户当前的缩放/平移）。
+    // 轨迹几何变化由上方 watch 处理（它只在指纹变化时 fit）。
+    draw({ fit: false });
     refreshTiles();
   }
 );
@@ -278,6 +359,15 @@ watch(
 watch(
   () => props.stadiaKey,
   () => refreshTiles()
+);
+// 切换语言后同步全屏按钮的提示文案
+watch(
+  () => i18n.locale,
+  () => {
+    if (!fsBtn) return;
+    fsBtn.title = isFullscreen ? t('map.exitFullscreen') : t('map.fullscreen');
+    fsBtn.setAttribute('aria-label', fsBtn.title);
+  }
 );
 </script>
 

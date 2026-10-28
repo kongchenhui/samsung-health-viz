@@ -1,0 +1,7 @@
+{
+  "country": { "code": "AU", "names": { "zh": "澳大利亚", "en": "Australia" } },
+  "coordSys": "wgs84",
+  "cities": [
+    { "names": { "zh": "悉尼", "en": "Sydney" }, "lat": -33.8688, "lon": 151.2093 }
+  ]
+}

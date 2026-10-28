@@ -1,6 +1,8 @@
 // 从骑行数据集派生统计（纯函数，组件里用 computed 调用）
 import { km, speedKmh, durationText } from './format.js';
+import { t } from './i18n.js';
 
+// 年份色：明暗主题共用同一套亮色（地图轨迹、图例、柱状图统一）
 export const YEAR_COLORS = { 2024: '#fbbf24', 2025: '#38bdf8', 2026: '#a78bfa' };
 export const FALLBACK_COLOR = '#94a3b8';
 
@@ -13,7 +15,7 @@ export function rideTooltipHtml(r) {
     `<b>${r.date.slice(0, 10)}</b> ${r.start.slice(11, 16)}`,
     `${km(r.distanceM)} · ${durationText(r.durationMs)}`,
   ];
-  if (r.avgSpeedMps) parts.push(`均速 ${speedKmh(r.avgSpeedMps)}`);
+  if (r.avgSpeedMps) parts.push(`${t('map.avgSpeed')} ${speedKmh(r.avgSpeedMps)}`);
   return `<div class="map-tip-inner">${parts.join('<br/>')}</div>`;
 }
 
@@ -58,18 +60,22 @@ export function personalBests(rides) {
   if (!valid.length) return [];
   const longest = pick(valid, (r) => r.distanceM);
   const longestTime = pick(valid, (r) => r.durationMs || 0);
-  const fastest = pick(
-    valid.filter((r) => r.durationMs > 600000),
-    (r) => r.avgSpeedMps || 0
-  );
+  // 速度榜只统计 10 分钟以上骑行；全短途时回退到全部有效骑行，避免空数组 pick 出 undefined 后崩溃
+  const longRides = valid.filter((r) => (r.durationMs || 0) > 600000);
+  const fastest = pick(longRides.length ? longRides : valid, (r) => r.avgSpeedMps || 0);
   const climb = pick(valid, (r) => r.elevGainM || 0);
   const burn = pick(valid, (r) => r.calories || 0);
   return [
-    { key: 'distance', label: '最长单次距离', value: km(longest.distanceM), ride: longest },
-    { key: 'duration', label: '最长骑行时间', value: durationText(longestTime.durationMs), ride: longestTime },
-    { key: 'speed', label: '最快平均速度', value: speedKmh(fastest.avgSpeedMps), ride: fastest },
-    { key: 'climb', label: '最大累计爬升', value: `${Math.round(climb.elevGainM || 0)} m`, ride: climb },
-    { key: 'calories', label: '单次最大消耗', value: `${Math.round(burn.calories || 0)} kcal`, ride: burn },
+    { key: 'distance', label: t('pb.distance'), value: km(longest.distanceM), ride: longest },
+    { key: 'duration', label: t('pb.duration'), value: durationText(longestTime.durationMs), ride: longestTime },
+    {
+      key: 'speed',
+      label: t('pb.speed'),
+      value: fastest.avgSpeedMps ? speedKmh(fastest.avgSpeedMps) : '—',
+      ride: fastest,
+    },
+    { key: 'climb', label: t('pb.climb'), value: `${Math.round(climb.elevGainM || 0)} m`, ride: climb },
+    { key: 'calories', label: t('pb.calories'), value: `${Math.round(burn.calories || 0)} kcal`, ride: burn },
   ];
 }
 

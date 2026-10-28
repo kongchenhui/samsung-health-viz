@@ -1,8 +1,15 @@
 <script setup>
 import { useRouter } from 'vue-router';
 import { pickZip, pickFolder } from '../store.js';
+import { t } from '../lib/i18n.js';
 
 const router = useRouter();
+
+/** 设置统一走路由拦截：这里只导航，主窗口会被 beforeEach 引导到独立设置窗口 */
+function openSettings() {
+  // 手机直传入口直接落到「数据」分栏
+  router.push({ name: 'settings', query: { tab: 'data' } });
+}
 </script>
 
 <template>
@@ -21,34 +28,30 @@ const router = useRouter();
           <path d="M18 44l10-16h12l6 16M28 28l6 16M40 28l-2-8h8" fill="none" stroke="#ffb02e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </div>
-      <h1>把三星健康数据画在地图上</h1>
-      <p class="welcome-sub">
-        导入三星健康（Samsung Health）导出的数据包，自动解析骑行记录与 GPS 轨迹，生成本地地图与统计。首期为骑行模块，后续将扩展到步数、睡眠、心率等更多数据。
-      </p>
+      <h1>{{ t('welcome.title') }}</h1>
+      <p class="welcome-sub">{{ t('welcome.sub') }}</p>
 
       <div class="dropzone">
         <span class="drop-icon">⤓</span>
-        <b>拖拽数据包到这里</b>
-        <span class="muted">支持 <code>samsunghealth_*.zip</code> 或解压后的文件夹</span>
+        <b>{{ t('welcome.dropTitle') }}</b>
+        <span class="muted" v-html="t('welcome.dropHint')"></span>
       </div>
 
       <div class="welcome-actions">
-        <button class="btn primary" @click="pickZip()">选择 ZIP 数据包</button>
-        <button class="btn ghost" @click="pickFolder()">选择解压文件夹</button>
-        <button class="btn ghost" @click="router.push('/data')">手机直传（局域网）→</button>
+        <button class="btn primary" @click="pickZip()">{{ t('welcome.pickZip') }}</button>
+        <button class="btn ghost" @click="pickFolder()">{{ t('welcome.pickFolder') }}</button>
+        <button class="btn ghost" @click="openSettings">{{ t('welcome.lanLink') }}</button>
       </div>
 
-      <p class="welcome-lan-hint">
-        不想插数据线？在「数据」页开启接收，手机装仓库里的直传 App 选中导出目录即可一键打包上传。
-      </p>
+      <p class="welcome-lan-hint">{{ t('welcome.lanHint') }}</p>
 
       <ol class="steps">
-        <li>手机三星健康 App → 设置 → 下载个人数据，得到 <code>samsunghealth_&lt;手机号&gt;_&lt;时间&gt;.zip</code></li>
-        <li>在这里选择该 ZIP（或先解压后选择文件夹），解析出骑行记录与轨迹</li>
-        <li>解析完成后进入「生涯」页；数据只在本机处理，可随时在「数据」页更换数据包</li>
+        <li v-html="t('welcome.step1')"></li>
+        <li>{{ t('welcome.step2') }}</li>
+        <li>{{ t('welcome.step3') }}</li>
       </ol>
 
-      <p class="privacy">🔒 所有解析都在本机完成，数据包不会上传；解析结果缓存在应用数据目录。</p>
+      <p class="privacy">{{ t('welcome.privacy') }}</p>
     </div>
   </div>
 </template>

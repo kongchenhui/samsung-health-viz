@@ -112,22 +112,23 @@ export const TILES = {
   plain: { url: null, options: {}, attribution: '' },
 };
 
+// label 为 i18n key（lib/i18n.js 的 mapStyle.*），渲染时用 t(label) 本地化
 export const MAP_STYLE_OPTIONS = [
-  { value: 'amap-dark', label: '高德 · 暗色' },
-  { value: 'amap', label: '高德 · 标准' },
-  { value: 'amap-sat', label: '高德 · 卫星' },
-  { value: 'alidade-smooth', label: 'Stadia · Alidade Smooth' },
-  { value: 'alidade-smooth-dark', label: 'Stadia · Alidade Smooth Dark' },
-  { value: 'alidade-bright', label: 'Stadia · Alidade Bright' },
-  { value: 'alidade-satellite', label: 'Stadia · Alidade Satellite' },
-  { value: 'outdoors', label: 'Stadia · Outdoors' },
-  { value: 'stamen-toner', label: 'Stadia · Stamen Toner' },
-  { value: 'stamen-terrain', label: 'Stadia · Stamen Terrain' },
-  { value: 'stamen-watercolor', label: 'Stadia · Stamen Watercolor' },
-  { value: 'osm-bright', label: 'Stadia · OSM Bright' },
-  { value: 'satellite', label: '卫星影像' },
-  { value: 'osm', label: 'OpenStreetMap' },
-  { value: 'plain', label: '无底图' },
+  { value: 'amap-dark', label: 'mapStyle.amap-dark' },
+  { value: 'amap', label: 'mapStyle.amap' },
+  { value: 'amap-sat', label: 'mapStyle.amap-sat' },
+  { value: 'alidade-smooth', label: 'mapStyle.alidade-smooth' },
+  { value: 'alidade-smooth-dark', label: 'mapStyle.alidade-smooth-dark' },
+  { value: 'alidade-bright', label: 'mapStyle.alidade-bright' },
+  { value: 'alidade-satellite', label: 'mapStyle.alidade-satellite' },
+  { value: 'outdoors', label: 'mapStyle.outdoors' },
+  { value: 'stamen-toner', label: 'mapStyle.stamen-toner' },
+  { value: 'stamen-terrain', label: 'mapStyle.stamen-terrain' },
+  { value: 'stamen-watercolor', label: 'mapStyle.stamen-watercolor' },
+  { value: 'osm-bright', label: 'mapStyle.osm-bright' },
+  { value: 'satellite', label: 'mapStyle.satellite' },
+  { value: 'osm', label: 'mapStyle.osm' },
+  { value: 'plain', label: 'mapStyle.plain' },
 ];
 
 export function makeMap(el) {
@@ -238,15 +239,17 @@ export function projectPoint(style, lat, lon, coordSys = 'wgs84') {
   return isGcjData ? gcj2wgs(lat, lon) : [lat, lon];
 }
 
-export function speedColor(v, p5, p95) {
+// 默认色阶是深色主题用的；浅色主题由 palette.speedStops 传入
+const DEFAULT_SPEED_STOPS = [
+  [0, [56, 189, 248]],
+  [0.35, [45, 212, 191]],
+  [0.65, [250, 204, 21]],
+  [1, [248, 113, 113]],
+];
+
+export function speedColor(v, p5, p95, stops = DEFAULT_SPEED_STOPS) {
   // 速度色阶：慢 → 快
   const t = Math.max(0, Math.min(1, (v - p5) / Math.max(0.001, p95 - p5)));
-  const stops = [
-    [0, [56, 189, 248]],
-    [0.35, [45, 212, 191]],
-    [0.65, [250, 204, 21]],
-    [1, [248, 113, 113]],
-  ];
   let a = stops[0];
   let b = stops[stops.length - 1];
   for (let i = 0; i < stops.length - 1; i++) {

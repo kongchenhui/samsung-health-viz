@@ -1,0 +1,7 @@
+{
+  "country": { "code": "SG", "names": { "zh": "新加坡", "en": "Singapore" } },
+  "coordSys": "wgs84",
+  "cities": [
+    { "names": { "zh": "新加坡", "en": "Singapore" }, "lat": 1.3521, "lon": 103.8198 }
+  ]
+}

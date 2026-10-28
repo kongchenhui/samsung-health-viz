@@ -100,6 +100,7 @@ function sleep(ms) {
  * @param {string} [opts.token] 6 位令牌；不传则随机生成
  * @param {number} [opts.maxBytes] 单次上传上限
  * @param {boolean} [opts.beacon=true] 是否发 UDP 发现广播
+ * @param {'zh'|'en'} [opts.locale='zh'] 事件里用户可见文案的语言
  * @param {(event: object) => void} [opts.onEvent] 事件回调
  * @returns {Promise<{info: Function, stop: Function, regenerateToken: Function}>}
  */
@@ -110,10 +111,14 @@ export async function startLanReceiver(opts = {}) {
     token = generateToken(),
     maxBytes = MAX_UPLOAD_BYTES,
     beacon = true,
+    locale = 'zh',
     onEvent = () => {},
   } = opts;
 
-  if (!uploadDir) throw new Error('uploadDir is required');
+  // 事件里的用户可见文案（错误信息等）按 locale 输出；协议里的错误码保持英文 token
+  const msg = (zh, en) => (locale === 'en' ? en : zh);
+
+  if (!uploadDir) throw new Error(msg('缺少上传目录参数', 'uploadDir is required'));
   fs.mkdirSync(uploadDir, { recursive: true });
   // 清理上次异常退出留下的半成品
   for (const f of fs.readdirSync(uploadDir)) {
@@ -182,6 +187,7 @@ export async function startLanReceiver(opts = {}) {
     const ip = clientIp(req);
     if (rateLimited(ip)) {
       req.resume();
+      emit({ type: 'upload-rejected', reason: 'too-many-attempts', ip });
       return json(res, 429, { ok: false, error: 'too-many-attempts' });
     }
     if (!tokenEquals(req.headers['x-upload-token'], state.token)) {
@@ -192,6 +198,7 @@ export async function startLanReceiver(opts = {}) {
     }
     if (state.busy) {
       req.resume();
+      emit({ type: 'upload-rejected', reason: 'busy', ip });
       return json(res, 409, { ok: false, error: 'busy' });
     }
 
@@ -257,7 +264,10 @@ export async function startLanReceiver(opts = {}) {
       aborted = true;
       ws.destroy();
       cleanup();
-      emit({ type: 'error', message: `接收中断：${err?.message || err}` });
+      emit({
+        type: 'error',
+        message: msg(`接收中断：${err?.message || err}`, `Upload interrupted: ${err?.message || err}`),
+      });
       if (!res.headersSent) json(res, 500, { ok: false, error: 'aborted' });
       return;
     }
@@ -301,7 +311,7 @@ export async function startLanReceiver(opts = {}) {
       fs.renameSync(partPath, finalPath);
     } catch (err) {
       cleanup();
-      emit({ type: 'error', message: `保存失败：${err?.message || err}` });
+      emit({ type: 'error', message: msg(`保存失败：${err?.message || err}`, `Failed to save upload: ${err?.message || err}`) });
       return json(res, 500, { ok: false, error: 'save-failed' });
     }
 

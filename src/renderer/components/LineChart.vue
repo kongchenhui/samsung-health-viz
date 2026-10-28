@@ -5,6 +5,9 @@ import { use } from 'echarts/core';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
+import { store } from '../store.js';
+import { chartColors } from '../lib/palette.js';
+import { t } from '../lib/i18n.js';
 
 use([LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
@@ -12,10 +15,10 @@ const props = defineProps({
   series: { type: Array, default: () => [] }, // [{ name, color, points: [[x, y]], area?: bool }]
   height: { type: Number, default: 200 },
   unit: { type: String, default: '' },
-  xUnit: { type: String, default: '分钟' },
+  xUnit: { type: String, default: '' },
   yFormat: { type: Function, default: (v) => String(Math.round(v)) },
   xFormat: { type: Function, default: (v) => String(Math.round(v)) },
-  empty: { type: String, default: '暂无数据' },
+  empty: { type: String, default: '' },
 });
 
 const hasData = computed(() =>
@@ -31,6 +34,9 @@ function rgba(hex, alpha) {
 }
 
 const option = computed(() => {
+  // 依赖 store.theme：主题切换时重算配色（CSS 变量对 Canvas 无效）
+  void store.theme;
+  const c = chartColors();
   const series = props.series
     .filter((s) => Array.isArray(s.points) && s.points.length > 1)
     .map((s) => ({
@@ -66,19 +72,19 @@ const option = computed(() => {
     tooltip: {
       trigger: 'axis',
       confine: true,
-      backgroundColor: 'rgba(13,19,28,0.96)',
-      borderColor: '#1e2a3a',
+      backgroundColor: c.tipBg,
+      borderColor: c.tipBorder,
       borderWidth: 1,
       padding: [8, 10],
-      textStyle: { color: '#e8eef7', fontSize: 11.5 },
-      axisPointer: { type: 'line', lineStyle: { color: '#5b6b80', type: 'dashed' } },
+      textStyle: { color: c.tipText, fontSize: 11.5 },
+      axisPointer: { type: 'line', lineStyle: { color: c.pointer, type: 'dashed' } },
       formatter: (params) => {
         if (!params.length) return '';
-        const head = `<div style="color:#8a99ad;margin-bottom:4px">${Math.round(params[0].value[0])} ${props.xUnit}</div>`;
+        const head = `<div style="color:${c.tipMuted};margin-bottom:4px">${Math.round(params[0].value[0])} ${props.xUnit}</div>`;
         const rows = params
           .map(
             (p) =>
-              `<div style="display:flex;align-items:center;gap:6px">${p.marker}<span style="color:#c3cfdd">${p.seriesName}</span><b style="margin-left:auto;padding-left:12px">${props.yFormat(p.value[1])} ${props.unit}</b></div>`
+              `<div style="display:flex;align-items:center;gap:6px">${p.marker}<span style="color:${c.tipLabel}">${p.seriesName}</span><b style="margin-left:auto;padding-left:12px">${props.yFormat(p.value[1])} ${props.unit}</b></div>`
           )
           .join('');
         return head + rows;
@@ -90,14 +96,14 @@ const option = computed(() => {
       max: 'dataMax',
       axisLine: { show: false },
       axisTick: { show: false },
-      splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.06)' } },
-      axisLabel: { color: '#8a99ad', fontSize: 10.5, formatter: (v) => props.xFormat(v) },
+      splitLine: { show: true, lineStyle: { color: c.split } },
+      axisLabel: { color: c.axis, fontSize: 10.5, formatter: (v) => props.xFormat(v) },
     },
     yAxis: {
       type: 'value',
       scale: true,
-      splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.06)' } },
-      axisLabel: { color: '#8a99ad', fontSize: 10.5, formatter: (v) => props.yFormat(v) },
+      splitLine: { show: true, lineStyle: { color: c.split } },
+      axisLabel: { color: c.axis, fontSize: 10.5, formatter: (v) => props.yFormat(v) },
     },
     series,
   };
@@ -107,6 +113,6 @@ const option = computed(() => {
 <template>
   <div class="chart" :style="{ height: height + 'px' }">
     <VChart v-if="hasData" class="echart" :option="option" autoresize />
-    <div v-else class="chart-empty">{{ empty }}</div>
+    <div v-else class="chart-empty">{{ empty || t('common.noData') }}</div>
   </div>
 </template>

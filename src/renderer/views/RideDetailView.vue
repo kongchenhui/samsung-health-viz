@@ -2,9 +2,11 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { store, setMapStyle } from '../store.js';
-import { km, speedKmh, durationText, dateCN, weekdayCN, timeHM, paceText } from '../lib/format.js';
+import { km, speedKmh, durationText, dateText, weekdayText, timeHM, paceText, weatherText } from '../lib/format.js';
 import { yearColor } from '../lib/data.js';
 import { speedColor, MAP_STYLE_OPTIONS } from '../lib/leaflet.js';
+import { chartColors } from '../lib/palette.js';
+import { t } from '../lib/i18n.js';
 import MapPanel from '../components/MapPanel.vue';
 import LineChart from '../components/LineChart.vue';
 
@@ -12,6 +14,9 @@ const props = defineProps({ id: { type: String, default: null } });
 const router = useRouter();
 
 const ride = computed(() => (store.dataset?.rides || []).find((r) => r.id === props.id));
+
+// 图表系列色随主题重算（暗色亮色各一套，Canvas 绘制拿不到 CSS 变量）
+const seriesColors = computed(() => chartColors().series);
 
 function percentile(arr, q) {
   const a = [...arr].sort((x, y) => x - y);
@@ -23,8 +28,10 @@ const segments = computed(() => {
   if (!r || !r.hasTrack) return [];
   const { lat, lon, t } = r.track;
   const sp = (r.speed || []).filter((p) => p[1] > 0.3);
+  const themeColors = chartColors();
   if (!sp.length) {
-    return [{ color: '#38bdf8', latlngs: lat.map((la, i) => [la, lon[i]]) }];
+    const [rr, gg, bb] = themeColors.speedStops[0][1];
+    return [{ color: `rgb(${rr}, ${gg}, ${bb})`, latlngs: lat.map((la, i) => [la, lon[i]]) }];
   }
   const speeds = sp.map((p) => p[1]);
   const p5 = percentile(speeds, 0.05);
@@ -48,7 +55,7 @@ const segments = computed(() => {
   };
   const runs = [];
   for (let i = 1; i < lat.length; i++) {
-    const color = speedColor(speedAt(t[i]), p5, p95);
+    const color = speedColor(speedAt(t[i]), p5, p95, themeColors.speedStops);
     const p1 = [lat[i - 1], lon[i - 1]];
     const p2 = [lat[i], lon[i]];
     const last = runs[runs.length - 1];
@@ -85,15 +92,15 @@ const stats = computed(() => {
   const r = ride.value;
   if (!r) return [];
   return [
-    { label: '距离', value: km(r.distanceM) },
-    { label: '时长', value: durationText(r.durationMs) },
-    { label: '平均速度', value: r.avgSpeedMps ? speedKmh(r.avgSpeedMps) : '—' },
-    { label: '最高速度', value: r.maxSpeedMps ? speedKmh(r.maxSpeedMps) : '—' },
-    { label: '累计爬升', value: r.elevGainM != null ? Math.round(r.elevGainM) + ' m' : '—' },
-    { label: '累计下降', value: r.elevLossM != null ? Math.round(r.elevLossM) + ' m' : '—' },
-    { label: '消耗', value: r.calories != null ? Math.round(r.calories) + ' kcal' : '—' },
-    { label: '平均心率', value: r.meanHr ? Math.round(r.meanHr) + ' bpm' : '—' },
-    { label: '最高心率', value: r.maxHr ? Math.round(r.maxHr) + ' bpm' : '—' },
+    { label: t('detail.distance'), value: km(r.distanceM) },
+    { label: t('detail.duration'), value: durationText(r.durationMs) },
+    { label: t('detail.avgSpeed'), value: r.avgSpeedMps ? speedKmh(r.avgSpeedMps) : '—' },
+    { label: t('detail.maxSpeed'), value: r.maxSpeedMps ? speedKmh(r.maxSpeedMps) : '—' },
+    { label: t('detail.gain'), value: r.elevGainM != null ? Math.round(r.elevGainM) + ' m' : '—' },
+    { label: t('detail.loss'), value: r.elevLossM != null ? Math.round(r.elevLossM) + ' m' : '—' },
+    { label: t('detail.calories'), value: r.calories != null ? Math.round(r.calories) + ' kcal' : '—' },
+    { label: t('detail.avgHr'), value: r.meanHr ? Math.round(r.meanHr) + ' bpm' : '—' },
+    { label: t('detail.maxHr'), value: r.maxHr ? Math.round(r.maxHr) + ' bpm' : '—' },
   ];
 });
 </script>
@@ -101,19 +108,25 @@ const stats = computed(() => {
 <template>
   <section v-if="ride" class="page">
     <div class="detail-head">
-      <button class="btn ghost small" @click="router.push('/rides')">← 返回记录</button>
+      <button class="btn ghost small" @click="router.push('/rides')">{{ t('detail.back') }}</button>
       <div class="detail-title">
         <div class="title-line">
           <span class="date-dot" :style="{ background: yearColor(ride.date) }"></span>
-          <h1>{{ dateCN(ride.date) }}</h1>
-          <span class="muted">{{ weekdayCN(ride.date) }}</span>
-          <span v-if="!ride.hasTrack" class="tag warn">无 GPS 轨迹</span>
+          <h1>{{ dateText(ride.date) }}</h1>
+          <span class="muted">{{ weekdayText(ride.date) }}</span>
+          <span v-if="!ride.hasTrack" class="tag warn">{{ t('detail.noTrack') }}</span>
         </div>
         <p class="page-sub">
           {{ timeHM(ride.start) }} — {{ timeHM(ride.end) }}
           <template v-if="ride.weather">
-            · {{ ride.weather.phrase }} {{ ride.weather.temperature }}°C · 湿度 {{ ride.weather.humidity }}% · 风速
-            {{ ride.weather.windSpeed }} {{ ride.weather.windUnit }}
+            · {{ weatherText(ride.weather.phrase) }} {{ ride.weather.temperature }}°C ·
+            {{
+              t('detail.humidityWind', {
+                humidity: ride.weather.humidity,
+                wind: ride.weather.windSpeed,
+                unit: ride.weather.windUnit,
+              })
+            }}
           </template>
         </p>
       </div>
@@ -128,19 +141,27 @@ const stats = computed(() => {
 
     <div class="card map-card detail-map-card">
       <div class="card-head">
-        <h3>轨迹 <span class="muted small">{{ ride.hasTrack ? `${ride.track.lat.length} 个点` : '' }}</span></h3>
+        <h3>
+          {{ t('detail.track') }}
+          <span class="muted small">{{ ride.hasTrack ? t('detail.points', { n: ride.track.lat.length }) : '' }}</span>
+        </h3>
         <div class="card-tools">
           <div v-if="ride.hasTrack" class="speed-legend">
-            <span>慢</span>
+            <span>{{ t('detail.slow') }}</span>
             <i class="speed-gradient"></i>
-            <span>快</span>
+            <span>{{ t('detail.fast') }}</span>
           </div>
-          <label class="dim-control" title="底图淡化：调高后底图更淡，轨迹更突出">
-            <span>底图淡化</span>
+          <label class="dim-control" :title="t('career.dimBasemapTip')">
+            <span>{{ t('career.dimBasemap') }}</span>
             <input v-model.number="store.mapDim" type="range" min="0" max="100" step="1" />
           </label>
-          <select class="select" :value="store.mapStyle" @change="setMapStyle($event.target.value)">
-            <option v-for="o in MAP_STYLE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+          <select
+            class="select"
+            :value="store.mapStyle"
+            :aria-label="t('detail.track')"
+            @change="setMapStyle($event.target.value)"
+          >
+            <option v-for="o in MAP_STYLE_OPTIONS" :key="o.value" :value="o.value">{{ t(o.label) }}</option>
           </select>
         </div>
       </div>
@@ -153,66 +174,69 @@ const stats = computed(() => {
         :coord-sys="ride.coordSys || 'wgs84'"
         :dim="store.mapDim"
       />
-      <div v-else class="map-empty">
-        这次骑行没有记录 GPS 轨迹（可能手表未定位或为室内骑行），下方仍有速度/心率数据。
-      </div>
+      <div v-else class="map-empty">{{ t('detail.noTrackDesc') }}</div>
     </div>
 
     <div class="chart-grid">
       <div class="card">
-        <div class="card-head"><h3>速度</h3><span class="muted small">km/h</span></div>
+        <div class="card-head"><h3>{{ t('detail.speed') }}</h3><span class="muted small">km/h</span></div>
         <LineChart
-          :series="[{ name: '速度', color: '#38bdf8', points: speedPoints, area: true }]"
+          :series="[{ name: t('detail.speed'), color: seriesColors.speed, points: speedPoints, area: true }]"
           :height="190"
           unit="km/h"
-          x-unit="分钟"
+          :x-unit="t('common.min')"
           :y-format="(v) => v.toFixed(0)"
         />
       </div>
       <div class="card">
-        <div class="card-head"><h3>心率</h3><span class="muted small">bpm</span></div>
+        <div class="card-head"><h3>{{ t('detail.hr') }}</h3><span class="muted small">bpm</span></div>
         <LineChart
-          :series="[{ name: '心率', color: '#f87171', points: hrPoints, area: true }]"
+          :series="[{ name: t('detail.hr'), color: seriesColors.hr, points: hrPoints, area: true }]"
           :height="190"
           unit="bpm"
-          x-unit="分钟"
+          :x-unit="t('common.min')"
           :y-format="(v) => v.toFixed(0)"
-          empty="这次骑行没有心率记录"
+          :empty="t('detail.emptyHr')"
         />
       </div>
       <div class="card">
-        <div class="card-head"><h3>海拔</h3><span class="muted small">m</span></div>
+        <div class="card-head"><h3>{{ t('detail.altitude') }}</h3><span class="muted small">m</span></div>
         <LineChart
-          :series="[{ name: '海拔', color: '#2dd4bf', points: altPoints, area: true }]"
+          :series="[{ name: t('detail.altitude'), color: seriesColors.altitude, points: altPoints, area: true }]"
           :height="190"
           unit="m"
-          x-unit="分钟"
+          :x-unit="t('common.min')"
           :y-format="(v) => v.toFixed(0)"
-          empty="这次骑行没有海拔数据"
+          :empty="t('detail.emptyAlt')"
         />
       </div>
       <div class="card">
-        <div class="card-head"><h3>恢复心率</h3><span class="muted small">运动后</span></div>
+        <div class="card-head">
+          <h3>{{ t('detail.recovery') }}</h3>
+          <span class="muted small">{{ t('detail.recoverySub') }}</span>
+        </div>
         <LineChart
-          :series="[{ name: '恢复心率', color: '#a78bfa', points: recoveryPoints, area: true }]"
+          :series="[{ name: t('detail.recovery'), color: seriesColors.recovery, points: recoveryPoints, area: true }]"
           :height="190"
           unit="bpm"
-          x-unit="分钟"
+          :x-unit="t('common.min')"
           :y-format="(v) => v.toFixed(0)"
           :x-format="(v) => v.toFixed(1)"
-          empty="该次骑行没有恢复心率数据"
+          :empty="t('detail.emptyRecovery')"
         />
       </div>
     </div>
 
     <div v-if="splits.length" class="card splits-card">
       <div class="card-head">
-        <h3>分段配速</h3>
-        <span class="muted small">共 {{ splits.length }} 段 · 中位配速 {{ paceText(medianSplit) }}/km</span>
+        <h3>{{ t('detail.splits') }}</h3>
+        <span class="muted small">{{
+          t('detail.splitsSub', { n: splits.length, pace: paceText(medianSplit) })
+        }}</span>
       </div>
       <ul class="split-list">
         <li v-for="s in splits" :key="s.km">
-          <span class="split-km">第 {{ s.km }} km</span>
+          <span class="split-km">{{ t('detail.splitKm', { n: s.km }) }}</span>
           <div class="split-bar"><i :style="{ width: (s.sec / maxSplitSec) * 100 + '%' }"></i></div>
           <span class="split-pace">{{ paceText(s.sec) }}<em>/km</em></span>
         </li>
@@ -222,9 +246,9 @@ const stats = computed(() => {
 
   <section v-else class="page">
     <div class="empty-state">
-      <h2>没有找到这次骑行</h2>
-      <p class="muted">可能是数据包已更换，返回记录列表重新选择。</p>
-      <button class="btn ghost" @click="router.push('/rides')">返回记录</button>
+      <h2>{{ t('detail.notFound') }}</h2>
+      <p class="muted">{{ t('detail.notFoundDesc') }}</p>
+      <button class="btn ghost" @click="router.push('/rides')">{{ t('detail.backToList') }}</button>
     </div>
   </section>
 </template>
