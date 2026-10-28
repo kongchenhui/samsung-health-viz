@@ -176,7 +176,7 @@ CI 自动构建并发布，已安装的客户端即可检查到更新。
 
 **GitHub Actions**（`.github/workflows/build.yml`）：
 
-- 触发：手动触发，或推送 `v*` 版本 tag（推荐：`git tag v0.0.5 && git push origin v0.0.5`）；
+- 触发：手动触发，或推送 `v*` 版本 tag（推荐：`git tag v0.0.6 && git push origin v0.0.6`）；
 - 在 `macos-latest` / `windows-latest` / `ubuntu-latest` 上分别打包，产物以 artifact 上传；
 - `android` job 构建手机直传 App 的 debug APK（artifact `android-apk`）；
 - 最后的 `release` job 先校验 tag 与 `package.json` 的 `version` 一致，再汇总三平台安装包与 APK，
