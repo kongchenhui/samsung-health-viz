@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   store,
@@ -68,6 +68,22 @@ watch(
     }
   },
 );
+
+/* ---------- 分栏滚动位置记忆 ----------
+ * 切分栏只换右侧内容，滚动容器 .settings-content 是共用的；不处理会沿用上一栏的位置。
+ * 按 tab 记住离开时的位置，第一次进入的分栏从顶部开始（返回看过的分栏回到原位）。
+ */
+const contentEl = ref(null);
+const tabScrollPositions = new Map();
+watch(tab, async (to, from) => {
+  const el = contentEl.value;
+  if (!el) return;
+  if (from) tabScrollPositions.set(from, el.scrollTop);
+  // 等新分栏渲染完再还原，否则容器还是上一栏的高度，scrollTop 会被夹住
+  await nextTick();
+  if (tab.value !== to) return; // 期间又切了分栏，交给下一次 watch 处理
+  if (contentEl.value) contentEl.value.scrollTop = tabScrollPositions.get(to) ?? 0;
+});
 
 const themeModes = ['system', 'dark', 'light'];
 const styleName = computed(() => t('mapStyle.' + store.mapStyle));
@@ -224,7 +240,7 @@ onMounted(() => refreshLanStatus());
     </aside>
 
     <!-- 右侧内容 -->
-    <section class="settings-content">
+    <section ref="contentEl" class="settings-content">
       <!-- 通用：主题 / 语言 / 底图跟随主题 -->
       <template v-if="tab === 'general'">
         <div class="settings-page-head">

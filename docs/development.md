@@ -51,6 +51,8 @@ samsung-health-viz/
 - 渲染层用 `t('点分.key')` 取文案，回退链：当前语言 → 中文 → 英文 → 调用方 fallback → key 本身；
   日期 / 时长 / 星期等格式串也在 `ui.format` 里，格式化函数不再按语言写死分支。
 - 主进程通过 `main.mjs` 的 `readMainText()` 读取同目录文件；`src/locales/**/*` 已加入 electron-builder 的 `files`。
+- **用户数据不国际化**：导出包里的原始内容（天气短语等）原样展示，不翻译成界面语言；
+  `ui` / `main` 只放界面文案与格式模板，不要给数据内容建语言映射（例：天气短语直接显示导出原文）。
 
 ## 城市坐标（src/renderer/data/cities/）
 
@@ -61,6 +63,14 @@ samsung-health-viz/
 - 匹配逻辑在 `src/renderer/lib/cities.js`：起点 80km 内取最近城市，超出则显示「区域 N」；
   坐标只用于匹配，不参与地图渲染。
 
+## 窗口与页面滚动
+
+主窗口所有路由共用同一个 `<main class="view">` 滚动容器：`App.vue` 按 `route.fullPath`
+记住每个页面离开时的 `scrollTop`，切回该页面时还原（第一次进入的页面从顶部开始），
+否则切换页面会沿用上一页的滚动位置。设置窗口右侧 `.settings-content` 同理，按 `?tab=`
+记住每个分栏的位置。返回列表页（如从骑行详情返回）会回到原来的滚动位置。
+新增页面 / 分栏沿用这套机制，不要在其它组件里直接改这两个容器的滚动位置。
+
 ## 数据来源与解析规则
 
 只读解析以下文件（不修改原始数据包）：
@@ -69,7 +79,7 @@ samsung-health-viz/
 - `jsons/com.samsung.shealth.exercise/*/UUID.location_data.json`：逐秒 GPS（经纬度、海拔、时间）→ 抽稀 + Douglas-Peucker 简化后作为轨迹；
 - `jsons/.../UUID.live_data.json`：运动采样，用于速度曲线与每公里分段（缺失时用距离增量估算）；
 - `com.samsung.shealth.tracker.heart_rate.*.csv` + `binning_data.json`：live_data 没有心率时，用分钟级心率桶补齐；
-- `exercise.weather` / `exercise.recovery_heart_rate`：按 `exercise_id` 关联天气与恢复心率。
+- `exercise.weather` / `exercise.recovery_heart_rate`：按 `exercise_id` 关联天气与恢复心率（天气短语是导出原文，展示时原样输出，不翻译）。
 
 其他要点：CSV 首行是元信息、第二行才是表头；数据行末尾多一个空字段；所有时刻均为 UTC（+8 为北京时间）；
 `day_time` 是本地日期锚点。
@@ -113,6 +123,15 @@ OSM/卫星（WGS-84）与 GCJ-02 轨迹 → 反算回 WGS-84。详见 `src/rende
 底图主题、「底图淡化」和 Stadia API Key 保存在 `<userData>/settings.json`
 （macOS 为 `~/Library/Application Support/Samsung Health Viz/settings.json`）；
 `?map=` / `?dim=` 调试参数只对本次启动生效，不会覆盖已保存的偏好。
+
+窗口大小、位置与最大化/全屏状态用 Electron 内置的 `windowStatePersistence`
+（Electron 45+，实验特性）：主窗口和设置窗口各给一个唯一 `name`（`main` / `settings`），
+几何存在 `<userData>/Local State` 的 `windowStates.<name>` 段，变化后自动更新，
+启动时自动还原并把超出屏幕的窗口夹回可见区域（保留尺寸）；不需要第三方库，也不需要
+自己监听 resize/close 写盘。`--window-size` 调试参数优先于记忆值，该模式下不启用记忆，
+所以截图冒烟的尺寸不会写回。旧版本留下的 `window-state*.json` 不再使用，可以删除。
+想重置窗口几何时，关掉应用后清掉 `Local State` 里的 `windowStates` 即可
+（`BaseWindow.clearPersistedState(name)` 是代码里的等价做法）。
 
 ### Stadia API Key
 
@@ -206,8 +225,8 @@ pnpm check:lan      # 只跑局域网直传
 
 | 参数 | 作用 |
 |---|---|
-| `--user-data=<dir>` | 隔离用户数据目录（缓存 / settings.json），避免污染真实数据 |
-| `--window-size=980x720` | 强制主窗口尺寸 |
+| `--user-data=<dir>` | 隔离用户数据目录（缓存 / settings.json / 窗口几何），避免污染真实数据 |
+| `--window-size=980x720` | 强制主窗口尺寸（优先于窗口几何记忆，且不回写状态文件） |
 | `--window-kind=settings` | 主窗口直接渲染设置页（用于截设置窗口布局） |
 | `--data=<path>` | 启动后自动解析指定数据包 |
 | `--shot=<png>` | 启动后截图并退出（配合下面参数） |

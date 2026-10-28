@@ -89,23 +89,6 @@
       "11": "Nov",
       "12": "Dec"
     },
-    "weather": {
-      "clear": "Clear",
-      "partlyCloudy": "Partly cloudy",
-      "cloudy": "Cloudy",
-      "lightRain": "Light rain",
-      "rain": "Rain",
-      "heavyRain": "Heavy rain",
-      "thunderstorm": "Thunderstorm",
-      "sleet": "Sleet",
-      "lightSnow": "Light snow",
-      "snow": "Snow",
-      "heavySnow": "Heavy snow",
-      "fog": "Fog",
-      "mist": "Mist",
-      "haze": "Haze",
-      "windy": "Windy"
-    },
     "career": {
       "title": "Cycling Career",
       "subtitle": "{range} · {count} rides · {tracks} tracks · avg {speed}",

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onBeforeUnmount } from 'vue';
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   store,
@@ -22,6 +22,33 @@ const route = useRoute();
 const isSettingsWindow = window.api?.windowKind === 'settings';
 // 首次使用还没有数据包时也可以进「设置」页，从手机直传或手动选择数据包
 const showWelcome = computed(() => !isSettingsWindow && !store.dataset && route.name !== 'settings');
+
+/* ---------- 页面滚动位置记忆 ----------
+ * 主窗口所有路由共用同一个 <main class="view"> 滚动容器；不处理的话切换页面会沿用
+ * 上一页的 scrollTop（表现就是“滚动条位置共享/不对”）。这里按 route.fullPath 记住每个
+ * 页面离开时的位置，进入新页面时还原（第一次进入即回到顶部）；返回列表页自然回到原位。
+ */
+const viewEl = ref(null);
+const scrollPositions = new Map();
+watch(
+  () => route.fullPath,
+  async (to, from) => {
+    const el = viewEl.value;
+    if (!el) return;
+    if (from) scrollPositions.set(from, el.scrollTop);
+    // 等新页面渲染完再还原：此时容器高度才是新页面的，scrollTop 不会被浏览器夹掉
+    await nextTick();
+    if (route.fullPath !== to) return; // 期间又跳了，交给下一次 watch 处理
+    if (viewEl.value) viewEl.value.scrollTop = scrollPositions.get(to) ?? 0;
+  },
+);
+
+// 清空数据包后回到欢迎页：欢迎页不沿用其它页面的滚动位置
+watch(showWelcome, async (welcoming) => {
+  if (!welcoming) return;
+  await nextTick();
+  if (viewEl.value) viewEl.value.scrollTop = 0;
+});
 
 function onDragOver(e) {
   e.preventDefault();
@@ -75,7 +102,7 @@ onBeforeUnmount(() => {
     </template>
     <template v-else>
       <TitleBar />
-      <main class="view">
+      <main ref="viewEl" class="view">
         <WelcomeView v-if="showWelcome" />
         <router-view v-else v-slot="{ Component }">
           <component :is="Component" />

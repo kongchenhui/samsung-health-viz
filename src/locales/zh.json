@@ -89,23 +89,6 @@
       "11": "11月",
       "12": "12月"
     },
-    "weather": {
-      "clear": "晴",
-      "partlyCloudy": "多云",
-      "cloudy": "阴",
-      "lightRain": "小雨",
-      "rain": "中雨",
-      "heavyRain": "大雨",
-      "thunderstorm": "雷阵雨",
-      "sleet": "雨夹雪",
-      "lightSnow": "小雪",
-      "snow": "中雪",
-      "heavySnow": "大雪",
-      "fog": "雾",
-      "mist": "薄雾",
-      "haze": "霾",
-      "windy": "大风"
-    },
     "career": {
       "title": "骑行生涯",
       "subtitle": "{range} · {count} 次骑行 · {tracks} 条轨迹 · 平均 {speed}",

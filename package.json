@@ -1,6 +1,6 @@
 {
   "name": "samsung-health-viz",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
   "description": "Samsung Health data visualizer — cycling as the first module",
   "main": "main.mjs",
