@@ -126,7 +126,14 @@ function focusedOrMain() {
 
 /** 广播当前偏好给所有窗口（多窗口主题 / 语言 / 底图跟随状态同步） */
 function broadcastPrefs() {
-  broadcast('prefs:changed', { ...(readPrefs() || {}), theme: themeMode, locale: currentLocale });
+  broadcast('prefs:changed', {
+    ...(readPrefs() || {}),
+    theme: themeMode,
+    // 主进程按 themeSource 解析出的实际明暗：渲染层切到 system 后自己的
+    // prefers-color-scheme 会短暂滞后，靠这个值才能立刻对齐主题与联动底图
+    themeEffective: resolvedDark() ? 'dark' : 'light',
+    locale: currentLocale,
+  });
 }
 
 /* ---------- 缓存 ---------- */

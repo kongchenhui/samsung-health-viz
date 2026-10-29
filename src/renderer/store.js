@@ -102,19 +102,33 @@ function systemTheme() {
   return lightQuery?.matches ? 'light' : 'dark';
 }
 
-/** 由 themeMode 推导实际生效的主题，并写到 <body>（styles.css 用 body.theme-light 覆盖变量） */
-function applyTheme() {
-  store.theme = store.themeMode === 'system' ? systemTheme() : store.themeMode;
+/**
+ * 由 themeMode 推导实际生效的主题，并写到 <body>（styles.css 用 body.theme-light 覆盖变量）。
+ * @param {'dark'|'light'} [effective] 主进程解析好的生效主题。
+ *   切到「跟随系统」时，渲染层的 prefers-color-scheme 还被旧的显式 themeSource 锁着，
+ *   这时读 matchMedia 只会拿到切换前的明暗，所以优先用主进程给出的结论；
+ *   启动与系统外观变化这些主进程没参与判定的场景不传，退回读 matchMedia。
+ */
+function applyTheme(effective) {
+  const known = effective === 'dark' || effective === 'light' ? effective : null;
+  store.theme = known || (store.themeMode === 'system' ? systemTheme() : store.themeMode);
   document.body.classList.toggle('theme-light', store.theme === 'light');
+}
+
+/**
+ * 把「跟随主题」的底图对齐到当前生效主题（幂等）。
+ * 已配套的底图、用户手动选过的底图、没有明暗成对的底图都保持不动。
+ */
+function alignMapStyleWithTheme() {
+  if (!store.mapStyleAuto) return;
+  const swap = pairedStyleFor(store.theme, store.mapStyle);
+  if (swap) setMapStyle(swap, { fromTheme: true });
 }
 
 /** 生效主题变化后联动底图明暗（prev 为变化前的生效主题） */
 function syncMapStyleWithTheme(prevTheme) {
   if (prevTheme === store.theme) return;
-  // 只有「由主题自动挑选」的底图才联动，用户手动选过的保持不动
-  if (!store.mapStyleAuto) return;
-  const swap = pairedStyleFor(store.theme, store.mapStyle);
-  if (swap) setMapStyle(swap, { fromTheme: true });
+  alignMapStyleWithTheme();
 }
 
 /**
@@ -129,18 +143,36 @@ function alignMapStyleOnBoot() {
   store.mapStyle = swap;
 }
 
+// 主题切换序号：连点不同的主题模式时，只让最后一次的回包生效（IPC 回包顺序不保证）
+let themeSeq = 0;
+
 /**
  * 设置主题模式：'system' 跟随系统 / 'dark' 深色 / 'light' 浅色。
  * 切换后立即生效并落盘。
+ *
+ * 必须先问主进程再应用主题：主进程把 nativeTheme.themeSource 从显式的 light/dark
+ * 放开成 system 之后，渲染层的 prefers-color-scheme 才会变成系统真实明暗；抢先读
+ * matchMedia 会读到旧值，主题判错后「跟随主题」的底图也就不会跟着换
+ * （浅色 → 跟随系统（系统深色）时地图仍是浅色）。
  */
-export function setThemeMode(mode) {
+export async function setThemeMode(mode) {
   if (!THEME_MODES.includes(mode) || mode === store.themeMode) return;
+  const seq = ++themeSeq;
   const prev = store.theme;
   store.themeMode = mode;
-  applyTheme();
+  let effective = null;
+  try {
+    // 通知主进程（原生标题栏 / 原生主题跟随；preload 未加载时静默忽略），
+    // 并用它返回的生效明暗覆盖本窗口可能滞后的判断
+    const res = await window.api?.applyTheme?.(mode);
+    if (res?.theme === 'dark' || res?.theme === 'light') effective = res.theme;
+  } catch {
+    /* 主进程不可用（纯浏览器预览）时退回 matchMedia */
+  }
+  if (seq !== themeSeq) return; // 期间又切了主题，交给最后一次
+  applyTheme(effective);
   syncMapStyleWithTheme(prev);
-  // 通知主进程（原生标题栏 / 原生主题跟随；preload 未加载时静默忽略）
-  window.api?.applyTheme?.(store.themeMode);
+  // 底图按新主题换好之后再落盘：否则广播出去的是旧底图，其它窗口会跟着回退
   saveMapPrefs(true);
 }
 
@@ -194,10 +226,7 @@ export function styleHasPair(style) {
  */
 export function setMapStyleAuto(enabled) {
   store.mapStyleAuto = !!enabled;
-  if (store.mapStyleAuto) {
-    const swap = pairedStyleFor(store.theme, store.mapStyle);
-    if (swap) setMapStyle(swap, { fromTheme: true });
-  }
+  if (store.mapStyleAuto) alignMapStyleWithTheme();
   saveMapPrefs(true);
 }
 
@@ -541,16 +570,10 @@ export function setupLanEvents() {
  */
 export function applyExternalPrefs(prefs) {
   if (!prefs || typeof prefs !== 'object') return;
-  if (THEME_MODES.includes(prefs.theme) && prefs.theme !== store.themeMode) {
-    const prev = store.theme;
-    store.themeMode = prefs.theme;
-    applyTheme();
-    syncMapStyleWithTheme(prev);
-  }
-  if (LOCALE_CODES.includes(prefs.locale) && prefs.locale !== store.locale) {
-    store.locale = prefs.locale;
-    setLocale(prefs.locale);
-  }
+  // 顺序很重要：先套用广播里的底图/开关快照，再套用主题。
+  // 广播里的 mapStyle 可能还是主题切换前的旧值（另一窗口在主进程确认新主题之前就落盘了），
+  // 反过来先切主题再套旧底图，会把刚联动好的深/浅底图又覆盖回去
+  // （表现就是浅色 → 跟随系统（系统深色）后主题变深、地图不变）。
   if (typeof prefs.mapStyleAuto === 'boolean') store.mapStyleAuto = prefs.mapStyleAuto;
   if (typeof prefs.mapStyle === 'string' && TILES[prefs.mapStyle]) store.mapStyle = prefs.mapStyle;
   const dim = Number(prefs.mapDim);
@@ -558,6 +581,19 @@ export function applyExternalPrefs(prefs) {
     store.mapDim = Math.max(0, Math.min(100, dim));
   }
   if (typeof prefs.stadiaKey === 'string') store.stadiaKey = prefs.stadiaKey.trim() || STADIA_ENV_KEY;
+  if (THEME_MODES.includes(prefs.theme)) {
+    const prev = store.theme;
+    store.themeMode = prefs.theme;
+    // 以主进程解析出的生效明暗为准：本窗口的 prefers-color-scheme 可能还没跟上
+    applyTheme(prefs.themeEffective);
+    if (prev !== store.theme) syncMapStyleWithTheme(prev);
+  }
+  // 收尾再对一次：广播到达顺序不保证，跟随主题的底图必须与生效主题一致（幂等）
+  alignMapStyleWithTheme();
+  if (LOCALE_CODES.includes(prefs.locale) && prefs.locale !== store.locale) {
+    store.locale = prefs.locale;
+    setLocale(prefs.locale);
+  }
 }
 
 /** 另一窗口重新解析 / 清除了数据包：刷新本窗口的数据集 */
