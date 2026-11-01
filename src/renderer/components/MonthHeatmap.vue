@@ -49,7 +49,9 @@ const data = computed(() =>
     }))
   )
 );
-const maxKm = computed(() => Math.max(1, props.max / 1000));
+/* 归一化上限来自 data.js 的 monthHeat（已用 P90 剔除异常月份），与天视图同一套规则。
+ * 不直接用原始最大值：偶发一个超长月份会把其余月份全压到最浅一档。 */
+const maxKm = computed(() => Math.max(0.001, props.max / 1000));
 // 高度按**可见**行数算，折叠后不再随年份无限增长
 const height = computed(() => Math.max(130, visibleRows.value.length * 54 + 54));
 
@@ -99,19 +101,28 @@ const option = computed(() => {
       top: 'center',
       itemWidth: 10,
       itemHeight: 78,
+      // 连续色带（不分档）：与天视图共用同一组停靠点（含半透明低端），
+      // 这样深浅两个主题下颜色观感一致，深色主题也不会出现刺眼的浅色块。
       text: [t('heatmap.more'), t('heatmap.less')],
       textStyle: { color: c.axis, fontSize: 10 },
-      inRange: { color: c.heatRange },
+      inRange: { color: c.heatStops.map((s) => s.color) },
     },
     series: [
       {
         type: 'heatmap',
         data: data.value.map((d) => ({
           ...d,
+          // 没骑行的月份用「空格底色」，与天视图空格保持观感一致
+          itemStyle: d.value[2] > 0 ? undefined : { color: c.heatDayEmpty },
           label: {
-            color: d.value[2] > maxKm.value * 0.32 ? c.heatHiLabel : c.heatLowLabel,
+            // 深底写深色字会看不清，所以按「该格在色带上的位置」决定文字深浅：
+            // 超过 32% 饱和度就用反色文字
+            color: d.value[2] / maxKm.value > 0.32 ? c.heatHiLabel : c.heatLowLabel,
+            show: d.value[2] > 0,
           },
         })),
+        /* 空格（没骑行的月份）给一层和天视图相同的底色，而不是完全透明：
+         * 透明时空月份只是一个黑洞，看不出「这里有格子、只是没数据」。 */
         itemStyle: { borderRadius: 6, borderColor: c.heatGap, borderWidth: 2 },
         label: {
           show: true,

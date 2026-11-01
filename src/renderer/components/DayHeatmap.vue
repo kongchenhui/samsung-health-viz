@@ -5,6 +5,7 @@ import { chartColors } from '../lib/palette.js';
 import { km } from '../lib/format.js';
 import { t, tPlural } from '../lib/i18n.js';
 import { yearHeat, todayIso } from '../lib/calendar.js';
+import { sampleGradient } from '../lib/color-scale.js';
 
 /* 天视图（GitHub 贡献图样式的近一年日历）。
  * 为什么不用 ECharts 的 calendar 图表：那边要自己算坐标轴范围、格子尺寸和月份标签位置，
@@ -29,7 +30,10 @@ const colors = computed(() => {
   return chartColors();
 });
 const emptyColor = computed(() => colors.value.heatDayEmpty);
-const levelColor = (cell) => (cell.level > 0 ? colors.value.heatDay[cell.level - 1] : emptyColor.value);
+/* 连续取色：按 cell.t（0-1 的里程强度）在热力色带上插值，不再分档。
+ * 这样 20km 和 60km 一定不同色，颜色深浅与里程严格单调对应。 */
+const cellColor = (cell) =>
+  cell.t > 0 ? sampleGradient(cell.t, 0, 1, colors.value.heatStops) : emptyColor.value;
 
 const dayLabels = computed(() =>
   [0, 1, 2, 3, 4, 5, 6].map((d) => t('format.weekdays.' + ((d + weekStart.value) % 7))),
@@ -47,6 +51,11 @@ function showDayLabel(d) {
 const laneStyle = computed(() => ({
   gridTemplateColumns: `repeat(${heat.value.grid.length}, minmax(0, 1fr))`,
 }));
+// 图例渐变条：与格子用同一组停靠点，保证图例和实际着色一致
+const legendGradient = computed(() => {
+  const stops = colors.value.heatStops;
+  return `linear-gradient(90deg, ${stops.map((s) => `${s.color} ${(s.at * 100).toFixed(0)}%`).join(', ')})`;
+});
 /* 悬停样式与月视图（ECharts heatmap）保持同一套 token，避免两种视图观感割裂：
  * - 描边用 emphasis（月视图 emphasis.itemStyle.borderColor 就是这个），琥珀色而非黑色；
  * - 浮层背景/边框/文字用 tipBg / tipBorder / tipText，与 ECharts tooltip 一致。 */
@@ -141,10 +150,10 @@ function cellTitle(cell) {
             :key="cell.iso"
             class="dayheat-cell"
             :class="{ future: cell.future }"
-            :style="{ background: cell.future ? 'transparent' : levelColor(cell) }"
+            :style="{ background: cell.future ? 'transparent' : cellColor(cell) }"
             :title="cellTitle(cell)"
             :data-date="cell.iso"
-            :data-level="cell.level"
+            :data-t="cell.t"
             @mouseenter="onCellEnter(cell, $event)"
             @mouseleave="onCellLeave"
           ></i>
@@ -156,9 +165,10 @@ function cellTitle(cell) {
       <span class="muted small">
         {{ heat.empty ? t('calendar.dayEmpty') : t('calendar.daySummary', { n: heat.activeDays, dist: km(heat.totalDistanceM) }) }}
       </span>
+      <!-- 连续色带图例：一条渐变条 + 两端刻度文字，说明颜色是连续的而不是分档的 -->
       <span class="dayheat-legend" aria-hidden="true">
         <span class="muted small">{{ t('heatmap.less') }}</span>
-        <i v-for="l in heat.levels" :key="l" :style="{ background: colors.heatDay[l - 1] }"></i>
+        <i class="dayheat-bar" :style="{ background: legendGradient }"></i>
         <span class="muted small">{{ t('heatmap.more') }}</span>
       </span>
     </div>
@@ -318,9 +328,9 @@ function cellTitle(cell) {
   align-items: center;
   gap: 4px;
 }
-.dayheat-legend i {
-  width: 12px;
-  height: 12px;
-  border-radius: 2.5px;
+.dayheat-legend .dayheat-bar {
+  width: 64px;
+  height: 10px;
+  border-radius: 5px;
 }
 </style>

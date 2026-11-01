@@ -1,12 +1,13 @@
 // 骑行日历「天视图」纯逻辑自检（node scripts/check-calendar.mjs）
 //
 // 为什么单独一个脚本：src/renderer/lib/calendar.js 刻意不依赖 i18n / vue / DOM，
-// 就是为了能在 node 里直接跑；天视图的坑全在「跨周对齐 / 未来占位 / 分位数切档」
+// 就是为了能在 node 里直接跑；天视图的坑全在「跨周对齐 / 未来占位 / 连续色阶取色」
 // 这些纯计算上，靠肉眼点界面看不出来，改动后必须跑这里。
 //
 // 测试数据全部虚构（只有日期、里程、时长这些自造数值），不含任何真实骑行记录、账号或本机路径。
 import assert from 'node:assert/strict';
-import { yearHeat, todayIso, DEFAULT_WEEKS, HEAT_LEVELS } from '../src/renderer/lib/calendar.js';
+import { yearHeat, todayIso, DEFAULT_WEEKS, scaleCeiling } from '../src/renderer/lib/calendar.js';
+import { sampleGradient, mixColor, parseColor } from '../src/renderer/lib/color-scale.js';
 
 const DAY_MS = 86400000;
 // 固定「今天」，否则用例结果会随运行日期漂移（哪天跑都该是同一结论）
@@ -55,9 +56,8 @@ const shiftIso = (iso, days) => {
 };
 
 /* ---------------- 1. 常量与网格形状 ---------------- */
-await test('常量：DEFAULT_WEEKS = 53、HEAT_LEVELS = 4', () => {
+await test('常量：DEFAULT_WEEKS = 53', () => {
   assert.equal(DEFAULT_WEEKS, 53);
-  assert.equal(HEAT_LEVELS, 4);
 });
 
 await test('默认网格：53 列 × 7 天 = 371 格，每列正好 7 天', () => {
@@ -66,7 +66,6 @@ await test('默认网格：53 列 × 7 天 = 371 格，每列正好 7 天', () =
   assert.equal(heat.grid.length, DEFAULT_WEEKS);
   for (const week of heat.grid) assert.equal(week.length, 7);
   assert.equal(allCells(heat).length, 371);
-  assert.equal(heat.levels, HEAT_LEVELS);
 });
 
 await test('日期连续无空洞：相邻 cell 正好差 1 天', () => {
@@ -147,60 +146,77 @@ await test('同一天两条骑行：count=2、里程与时长累加（不是覆�
 });
 
 /* ---------------- 5. 色阶 ---------------- */
-await test('色阶：没骑行的天 level = 0', () => {
-  for (const c of allCells(yearHeat([], { today: TODAY }))) assert.equal(c.level, 0);
+await test('连续色阶：没骑行的天 t = 0', () => {
+  for (const c of allCells(yearHeat([], { today: TODAY }))) assert.equal(c.t, 0);
 });
 
-await test('色阶：有骑行的天 level 至少 1（不会掉回 0）', () => {
-  const heat = yearHeat([ride(TODAY, 12345), ride(shiftIso(TODAY, -100), 4000)], { today: TODAY });
-  for (const c of allCells(heat)) {
-    if (c.distanceM > 0) assert.ok(c.level >= 1, `${c.iso} 有里程却 level=${c.level}`);
-    else assert.equal(c.level, 0);
-  }
-});
-
-await test('色阶：所有骑行天里程都相同时落在最浅一档 1', () => {
+await test('连续色阶：有骑行的天 t 在 (0, 1] 且与里程单调', () => {
   const heat = yearHeat(
-    dailyRides('2026-03-01', 20, (start, i) => ride(shiftIso(start, i), 20000)),
+    [ride(TODAY, 12345), ride(shiftIso(TODAY, -100), 4000), ride(shiftIso(TODAY, -200), 60000)],
     { today: TODAY },
   );
-  assert.equal(heat.activeDays, 20);
-  const levels = allCells(heat).filter((c) => c.distanceM > 0).map((c) => c.level);
-  assert.deepEqual([...new Set(levels)], [1], `期望全为 1，实际 ${JSON.stringify(levels)}`);
-});
-
-await test('色阶：level 恒在 [0, levels] 区间内', () => {
-  for (const lv of [1, 2, 4, 8]) {
-    const heat = yearHeat(
-      dailyRides('2026-03-01', 60, (start, i) => ride(shiftIso(start, i), 1000 * (i + 1))),
-      { today: TODAY, levels: lv },
-    );
-    assert.equal(heat.levels, lv);
-    for (const c of allCells(heat)) {
-      assert.ok(Number.isInteger(c.level));
-      assert.ok(c.level >= 0 && c.level <= lv, `${c.iso} level=${c.level} 越界（levels=${lv}）`);
-    }
+  const cells = allCells(heat);
+  for (const c of cells) {
+    if (c.distanceM > 0) assert.ok(c.t > 0 && c.t <= 1, `${c.iso} 有里程却 t=${c.t}`);
+    else assert.equal(c.t, 0);
+  }
+  const sorted = cells.filter((c) => c.distanceM > 0).sort((a, b) => a.distanceM - b.distanceM);
+  for (let i = 1; i < sorted.length; i++) {
+    assert.ok(sorted[i].t >= sorted[i - 1].t, '里程越大 t 不能更小');
   }
 });
 
-await test('分位数切档：长尾分布下最远的一档 = levels，最近的一档 = 1', () => {
-  // 1..100 km 各一天：最大值 100km 远超其余，若按线性切档会挤在最浅一档，
-  // 这里断言分位数切档能让最高里程落满档、最低里程落 1 档。
-  const start = '2026-03-01';
-  const rides = dailyRides(start, 100, (s, i) => ride(shiftIso(s, i), 1000 * (i + 1)));
-  const heat = yearHeat(rides, { today: TODAY });
-  const cells = cellMap(heat);
-  const lowest = cells.get(start);
-  const highest = cells.get(shiftIso(start, 99));
-  assert.equal(highest.distanceM, 100000);
-  assert.equal(highest.level, heat.levels, `最高里程 level=${highest.level}，期望 ${heat.levels}`);
-  assert.equal(lowest.distanceM, 1000);
-  assert.equal(lowest.level, 1, `最低里程 level=${lowest.level}，期望 1`);
-  assert.equal(heat.activeDays, 100);
-  assert.equal(heat.thresholds.length, heat.levels - 1);
+await test('连续色阶：20km 与 60km 必须得到不同颜色（曾经的 bug）', () => {
+  // 曾经按分位数/固定档位切档，20km 和 60km 会落进同一档显示成同一个颜色。
+  // 连续插值下任意两个不同里程都应对应不同颜色。
+  const stops = [
+    { at: 0, color: 'rgba(255, 176, 46, 0.10)' },
+    { at: 0.5, color: 'rgba(255, 176, 46, 0.55)' },
+    { at: 1, color: '#ffb02e' },
+  ];
+  const MAX = 80000;
+  const c20 = sampleGradient(20000, 0, MAX, stops);
+  const c60 = sampleGradient(60000, 0, MAX, stops);
+  assert.notEqual(c20, c60, `20km 与 60km 颜色相同：${c20}`);
 });
 
-/* ---------------- 6. 闰年与跨年 ---------------- */
+await test('连续色阶：越界值夹到两端颜色，退化区间不产生 NaN', () => {
+  const stops = [{ at: 0, color: '#000000' }, { at: 1, color: '#ffffff' }];
+  assert.equal(sampleGradient(-100, 0, 100, stops), mixColor('#000000', '#ffffff', 0));
+  assert.equal(sampleGradient(1e9, 0, 100, stops), mixColor('#000000', '#ffffff', 1));
+  // min === max：返回首色而不是 NaN/透明
+  assert.equal(sampleGradient(5, 5, 5, stops), '#000000');
+  // 单停靠点
+  assert.equal(sampleGradient(5, 0, 100, [{ at: 0, color: '#123456' }]), '#123456');
+});
+
+await test('连续色阶：mixColor 支持半透明端点的 alpha 插值', () => {
+  const a = parseColor(mixColor('rgba(255,176,46,0.10)', 'rgba(255,176,46,0.55)', 0.5));
+  assert.ok(a && Math.abs(a.a - 0.325) < 0.01, `alpha 应插值到 0.325，实际 ${a && a.a}`);
+  // 若两端都不透明，返回 hex
+  assert.ok(mixColor('#000000', '#ffffff', 0.5).startsWith('#'), '不透明端点应返回 hex');
+});
+
+await test('scaleCeiling：上限取当前数据集最大值', () => {
+  assert.equal(scaleCeiling([10000, 30000, 200000]), 200000);
+  // 最大值那天必然染到满档
+  const heat = yearHeat(
+    [ride('2026-01-01', 10000), ride('2026-01-02', 30000), ride('2026-01-03', 200000)],
+    { today: TODAY },
+  );
+  const peak = allCells(heat).find((c) => c.distanceM === 200000);
+  assert.equal(peak.t, 1, `最大值应染满档，实际 t=${peak.t}`);
+  assert.equal(heat.scaleMaxM, 200000);
+});
+
+await test('scaleCeiling：空输入 / 全 0 / 非法值退化为 1，不返回 0', () => {
+  assert.equal(scaleCeiling([]), 1);
+  assert.equal(scaleCeiling([0, 0]), 1);
+  assert.equal(scaleCeiling(null), 1);
+  assert.equal(scaleCeiling([NaN, -5, null]), 1);
+  assert.equal(scaleCeiling([5000, 'abc']), 5000);
+});
+
 await test('闰年锚点 2028-02-29：不抛错，首尾相差正好 370 天', () => {
   const heat = yearHeat([ride('2028-02-29', 30000)], { today: '2028-02-29' });
   assert.equal(heat.anchorIso, '2028-02-29');
@@ -227,10 +243,10 @@ await test('空数据：empty = true、activeDays 0、不抛错、grid 仍是 37
   assert.equal(heat.totalDistanceM, 0);
   assert.equal(heat.totalCount, 0);
   assert.equal(heat.max, 0);
-  // 没有可切档的数据时阈值仍保持 levels - 1 个槽位（全 0），
-  // 这样调用方画色阶图例时不必判空；此时没有任何格子会拿到 >0 的 level。
-  assert.equal(heat.thresholds.length, heat.levels - 1);
-  assert.ok(heat.thresholds.every((t) => t === 0), `空数据阈值应为 0，实际 ${JSON.stringify(heat.thresholds)}`);
+  // 连续色阶：没有数据时上限退化为 1，避免调用方按 cell.t 取色时除以 0，
+  // 同时保证返回的是有限正数（图例色带仍能画出来）。
+  assert.equal(heat.scaleMaxM, 1);
+  assert.ok(Number.isFinite(heat.scaleMaxM) && heat.scaleMaxM > 0);
   assert.equal(allCells(heat).length, 371);
 });
 

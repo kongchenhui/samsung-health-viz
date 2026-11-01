@@ -1,6 +1,7 @@
 // 从骑行数据集派生统计（纯函数，组件里用 computed 调用）
 import { km, speedKmh, durationText } from './format.js';
 import { t } from './i18n.js';
+import { scaleCeiling } from './calendar.js';
 
 // 年份色：明暗主题共用同一套亮色（地图轨迹、图例、柱状图统一）
 //
@@ -135,7 +136,8 @@ export function monthHeat(rides) {
       return { key, month: i + 1, distanceM: v?.distanceM || 0, count: v?.count || 0 };
     }),
   }));
-  const max = Math.max(1, ...rows.flatMap((r) => r.months.map((m) => m.distanceM)));
+  // 归一化上限与天视图同一套规则：取当前数据集的最大值
+  const max = scaleCeiling(rows.flatMap((r) => r.months.map((m) => m.distanceM)));
   return { rows, max };
 }
 

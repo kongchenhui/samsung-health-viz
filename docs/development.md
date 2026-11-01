@@ -36,7 +36,7 @@ samsung-health-viz/
 ├── scripts/                 # 开发与自检脚本
 │   ├── dev.mjs              #   开发启动器（Vite + Electron）
 │   ├── check-coord-sys.mjs  #   坐标判定自检（改判定逻辑后先跑它）
-│   ├── check-calendar.mjs   #   日历天视图自检（跨周对齐 / 未来占位 / 色阶切档）
+│   ├── check-calendar.mjs   #   日历天视图自检（跨周对齐 / 未来占位 / 连续色阶）
 │   └── check-lan-upload.mjs #   局域网直传自检（伪造导出包 → 上传 → 解析全链路）
 ├── android/                 # 手机直传 App（Java + Gradle，纯系统 API）
 ├── docs/screenshots/        # 界面截图（虚构演示数据，已脱敏）
@@ -219,7 +219,7 @@ macOS 的 dmg 只能在 macOS 上构建（系统限制）。
 ```bash
 pnpm check          # 坐标判定 + 日历天视图 + 局域网接收器（含「伪造导出包 → 上传 → 真实解析」全链路）
 pnpm check:coord    # 只跑坐标判定
-pnpm check:calendar # 只跑日历天视图（跨周对齐 / 未来占位 / 分位数色阶 / 闰年 / 锚点回退）
+pnpm check:calendar # 只跑日历天视图（跨周对齐 / 未来占位 / 连续色阶取色 / 闰年 / 锚点回退）
 pnpm check:lan      # 只跑局域网直传
 ```
 
