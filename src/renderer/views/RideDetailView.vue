@@ -65,8 +65,20 @@ const segments = computed(() => {
   return runs;
 });
 
-const speedPoints = computed(() => (ride.value?.speed || []).map((p) => [p[0] / 60, p[1] * 3.6]));
-const hrPoints = computed(() => (ride.value?.hr || []).map((p) => [p[0] / 60, p[1]]));
+/* 序列点统一按时间排序后再交给折线图：
+ * 三星 live_data 不保证按时间排列，旧版解析器逐条收集时没排序，
+ * 于是序列里会出现一个时间戳回跳的点——折线会从那个点向前画回去，
+ * 表现就是一条横跨整张图的斜线。排序放在渲染层，已缓存的旧数据也能立即正常显示。 */
+function sortPoints(list, scale = 1) {
+  return (list || [])
+    .filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]))
+    .slice()
+    .sort((a, b) => a[0] - b[0])
+    .map((p) => [p[0] / 60, p[1] * scale]);
+}
+
+const speedPoints = computed(() => sortPoints(ride.value?.speed, 3.6));
+const hrPoints = computed(() => sortPoints(ride.value?.hr));
 const altPoints = computed(() => {
   const r = ride.value;
   if (!r?.hasTrack) return [];
@@ -78,7 +90,7 @@ const altPoints = computed(() => {
   }
   return out;
 });
-const recoveryPoints = computed(() => (ride.value?.recoveryHr || []).map((p) => [p[0] / 60, p[1]]));
+const recoveryPoints = computed(() => sortPoints(ride.value?.recoveryHr));
 
 const splits = computed(() => ride.value?.splits || []);
 const maxSplitSec = computed(() => Math.max(1, ...splits.value.map((s) => s.sec)));

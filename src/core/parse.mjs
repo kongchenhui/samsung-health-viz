@@ -442,6 +442,10 @@ export function buildCyclingDataset(reader, opts = {}) {
     if (liveFile) {
       try {
         const live = reader.readJson(jsonPath('com.samsung.shealth.exercise', liveFile));
+        /* 三星的 live_data 不保证按 start_time 升序（实测同一次骑行里会出现个别点插在错误位置）。
+         * 乱序会让速度序列出现时间回跳，折线图会把线段从那个点往回画成一条横贯全图的斜线；
+         * distPts 乱序还会让「累计里程」算错。这里先按时间稳定排序再收集。 */
+        live.sort((a, b) => (a?.start_time ?? 0) - (b?.start_time ?? 0));
         for (const p of live) {
           if (p.start_time == null) continue;
           const t = (p.start_time - startMs) / 1000;
