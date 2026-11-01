@@ -1,6 +1,7 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import VChart from 'vue-echarts';
+import HeatLegendBar from './HeatLegendBar.vue';
 import { use } from 'echarts/core';
 import { HeatmapChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, VisualMapComponent } from 'echarts/components';
@@ -49,11 +50,67 @@ const data = computed(() =>
     }))
   )
 );
-/* 归一化上限来自 data.js 的 monthHeat（已用 P90 剔除异常月份），与天视图同一套规则。
+/* 归一化上限来自 data.js 的 monthHeat（已用 P90 剔除异常月份），与日视图同一套规则。
  * 不直接用原始最大值：偶发一个超长月份会把其余月份全压到最浅一档。 */
 const maxKm = computed(() => Math.max(0.001, props.max / 1000));
 // 高度按**可见**行数算，折叠后不再随年份无限增长
 const height = computed(() => Math.max(130, visibleRows.value.length * 54 + 54));
+
+/* 色带悬停联动：与日视图同一套逻辑（组件回传值域区间，这里高亮命中的月份格）。
+ * 月视图的格子是 ECharts 画的，所以用 dispatchAction 的 highlight/downplay 推动画状态，
+ * 而不是像日视图那样改 class。 */
+const chartRef = ref(null);
+/* 悬停某个月份格时，把这个格的里程传给色带组件，指示器会挪到色带对应位置
+ * （对应 ECharts 的 _hoverLinkFromSeriesMouseOver：悬停数据 → 指示器跟随）。 */
+const hoverValueM = ref(null);
+function chartInstance() {
+  const c = chartRef.value;
+  return c?.chart || c || null;
+}
+/* 悬停格子 → 色带指示器跟随。
+ * 同时监听 mouseover 和 mousemove：只在 mouseover 上监听的话，在相邻格子之间滑动时
+ * 偶尔收不到新事件（ECharts 对同一 series 内部的移动不重复派发 mouseover）。
+ * 用 key 去重，避免 mousemove 每次都触发响应式更新。 */
+let lastHoverKey = null;
+function onChartMove(params) {
+  /* 注意空格子也要有反馈：月份没有骑行时 value 是 0，
+   * 指针同样应当落到色带最「少」的一端，标签显示 0。
+   * 只有鼠标在图表空白处（没有任何数据点）时才清空。 */
+  const hasCell = Array.isArray(params?.value) && Number.isFinite(Number(params.value[2]));
+  const v = hasCell ? Number(params.value[2]) : null;
+  const key = hasCell ? String(v) : '';
+  if (key === lastHoverKey) return;
+  lastHoverKey = key;
+  hoverValueM.value = hasCell ? v * 1000 : null;
+}
+function onChartOut() {
+  lastHoverKey = null;
+  hoverValueM.value = null;
+}
+onMounted(() => {
+  const inst = chartInstance();
+  if (!inst?.on) return;
+  inst.on('mouseover', onChartMove);
+  inst.on('mousemove', onChartMove);
+  // 鼠标离开整个图表时收起（mouseout 在格子之间移动也会触发，用 globalout 更准）
+  inst.on('globalout', onChartOut);
+});
+function dispatch(action) {
+  // vue-echarts 把 echarts 实例的方法代理到组件实例上，取不到时退回 .chart
+  const inst = chartRef.value;
+  const fn = inst?.dispatchAction || inst?.chart?.dispatchAction;
+  if (fn) fn.call(inst?.dispatchAction ? inst : inst.chart, action);
+}
+function onLegendHover(range) {
+  dispatch({ type: 'downplay', seriesIndex: 0 });
+  if (!range) return;
+  const dataIndex = [];
+  data.value.forEach((d, i) => {
+    const meters = d.value[2] * 1000;
+    if (d.value[2] > 0 && meters >= range.loVal && meters <= range.hiVal) dataIndex.push(i);
+  });
+  if (dataIndex.length) dispatch({ type: 'highlight', seriesIndex: 0, dataIndex });
+}
 
 const option = computed(() => {
   // 依赖 store.theme 与当前语言：切换后重算配色与文案
@@ -62,7 +119,10 @@ const option = computed(() => {
   return {
     animation: false,
     backgroundColor: 'transparent',
-    grid: { left: 48, right: 74, top: 8, bottom: 30 },
+    /* 右侧预留只需容纳悬停时浮出来的「≈ 224」标签（约 30px），
+     * 留太多会在最后一列与色带之间空出一整格宽的死白。
+     * 32 + 间隙 5 = 最后一列到色带左缘 37px，标签（最宽约「≈ 402」）刚好落在预留区内。 */
+    grid: { left: 48, right: 32, top: 8, bottom: 30 },
     tooltip: {
       confine: true,
       backgroundColor: c.tipBg,
@@ -92,19 +152,13 @@ const option = computed(() => {
       axisTick: { show: false },
       axisLabel: { color: c.axis, fontSize: 11 },
     },
+    /* visualMap 仍要保留——ECharts 的 heatmap 靠它把数值映射成颜色；
+     * 但不再显示它自带的色带（show: false），视觉上的色带由 HeatLegendBar 画，
+     * 这样天/月两个视图的色带是同一个组件，圆角、滑块、字号完全一致。 */
     visualMap: {
       min: 0,
       max: maxKm.value,
-      show: true,
-      orient: 'vertical',
-      right: 6,
-      top: 'center',
-      itemWidth: 10,
-      itemHeight: 78,
-      // 连续色带（不分档）：与天视图共用同一组停靠点（含半透明低端），
-      // 这样深浅两个主题下颜色观感一致，深色主题也不会出现刺眼的浅色块。
-      text: [t('heatmap.more'), t('heatmap.less')],
-      textStyle: { color: c.axis, fontSize: 10 },
+      show: false,
       inRange: { color: c.heatStops.map((s) => s.color) },
     },
     series: [
@@ -112,7 +166,7 @@ const option = computed(() => {
         type: 'heatmap',
         data: data.value.map((d) => ({
           ...d,
-          // 没骑行的月份用「空格底色」，与天视图空格保持观感一致
+          // 没骑行的月份用「空格底色」，与日视图空格保持观感一致
           itemStyle: d.value[2] > 0 ? undefined : { color: c.heatDayEmpty },
           label: {
             // 深底写深色字会看不清，所以按「该格在色带上的位置」决定文字深浅：
@@ -121,7 +175,7 @@ const option = computed(() => {
             show: d.value[2] > 0,
           },
         })),
-        /* 空格（没骑行的月份）给一层和天视图相同的底色，而不是完全透明：
+        /* 空格（没骑行的月份）给一层和日视图相同的底色，而不是完全透明：
          * 透明时空月份只是一个黑洞，看不出「这里有格子、只是没数据」。 */
         itemStyle: { borderRadius: 6, borderColor: c.heatGap, borderWidth: 2 },
         label: {
@@ -139,17 +193,28 @@ const option = computed(() => {
 
 <template>
   <div class="heatmap-wrap">
-    <div class="chart" :style="{ height: height + 'px' }">
-      <VChart class="echart" :option="option" autoresize />
+    <!-- 图表 + 竖向色带并排：色带放在日历右侧，与原来的 ECharts visualMap 位置一致 -->
+    <div class="heatmap-body">
+      <div class="chart" :style="{ height: height + 'px' }">
+        <VChart ref="chartRef" class="echart" :option="option" autoresize />
+      </div>
+      <HeatLegendBar
+        orient="vertical"
+        :max-m="props.max"
+        :active-value-m="hoverValueM"
+        @hover="onLegendHover"
+      />
     </div>
-    <!-- 年份多于默认展示数量时才出现：默认只看最近 N 年，全程由用户主动展开 -->
-    <button v-if="hiddenCount > 0 || expanded" type="button" class="link heatmap-more" @click="expanded = !expanded">
-      {{
-        expanded
-          ? t('career.calendarCollapse', { n: recentYears })
-          : t('career.calendarShowAll', { n: totalYears })
-      }}
-    </button>
+    <div class="heatmap-foot">
+      <!-- 年份多于默认展示数量时才出现：默认只看最近 N 年，全程由用户主动展开 -->
+      <button v-if="hiddenCount > 0 || expanded" type="button" class="link" @click="expanded = !expanded">
+        {{
+          expanded
+            ? t('career.calendarCollapse', { n: recentYears })
+            : t('career.calendarShowAll', { n: totalYears })
+        }}
+      </button>
+    </div>
   </div>
 </template>
 
@@ -158,9 +223,26 @@ const option = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
+  width: 100%;
 }
-.heatmap-more {
-  align-self: flex-end;
+/* 图表占满剩余宽度，竖向色带固定在右侧并垂直居中 */
+.heatmap-body {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  /* 色带右缘与卡片内容右缘留 7px，与旧版 visualMap 的 right: 6 视觉一致 */
+  padding-right: 7px;
+}
+.heatmap-body .chart {
+  flex: 1;
+  min-width: 0;
+}
+.heatmap-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  width: 100%;
 }
 </style>

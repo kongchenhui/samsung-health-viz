@@ -11,11 +11,17 @@ export function num(n) {
   return Number(n).toLocaleString('en-US');
 }
 
-export function km(m, digits) {
+/** 里程数值（**不带单位**）：色带刻度这类地方只要数字，加单位会挤占空间 */
+export function kmNumber(m, digits) {
   if (m == null) return '—';
   const v = m / 1000;
   const d = digits ?? (v >= 100 ? 1 : 2);
-  return v.toFixed(d) + ' km';
+  return v.toFixed(d);
+}
+
+export function km(m, digits) {
+  if (m == null) return '—';
+  return kmNumber(m, digits) + ' km';
 }
 
 export function speedKmh(mps, digits = 1) {

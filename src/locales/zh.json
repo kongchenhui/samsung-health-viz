@@ -91,7 +91,7 @@
     },
     "calendar": {
       "viewMonth": "月视图",
-      "viewDay": "天视图",
+      "viewDay": "日视图",
       "dayHint": "近一年每日里程，颜色越深当日骑得越远",
       "daySummary": "近一年 {n} 天有骑行 · {dist}",
       "dayEmpty": "近一年没有骑行记录",

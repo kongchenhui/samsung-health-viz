@@ -6,8 +6,9 @@ import { km } from '../lib/format.js';
 import { t, tPlural } from '../lib/i18n.js';
 import { yearHeat, todayIso } from '../lib/calendar.js';
 import { sampleGradient } from '../lib/color-scale.js';
+import HeatLegendBar from './HeatLegendBar.vue';
 
-/* 天视图（GitHub 贡献图样式的近一年日历）。
+/* 日视图（GitHub 贡献图样式的近一年日历）。
  * 为什么不用 ECharts 的 calendar 图表：那边要自己算坐标轴范围、格子尺寸和月份标签位置，
  * 而这里的需求只是「7 行 × 53 列的方块 + 月份标签」，纯 CSS grid 更稳：
  * 尺寸跟随容器宽度自适应、悬停用原生 tooltip、明暗主题靠 CSS 变量，且不必为它注册图表组件。 */
@@ -51,11 +52,23 @@ function showDayLabel(d) {
 const laneStyle = computed(() => ({
   gridTemplateColumns: `repeat(${heat.value.grid.length}, minmax(0, 1fr))`,
 }));
-// 图例渐变条：与格子用同一组停靠点，保证图例和实际着色一致
-const legendGradient = computed(() => {
-  const stops = colors.value.heatStops;
-  return `linear-gradient(90deg, ${stops.map((s) => `${s.color} ${(s.at * 100).toFixed(0)}%`).join(', ')})`;
+/* 色带悬停联动：组件只回传值域区间，这里据此决定高亮哪些格子。 */
+const barRange = ref(null);
+function onLegendHover(range) {
+  barRange.value = range;
+}
+/* 落在光标值域区间内的所有格子（聚合高亮）。
+ * 用原始里程比较而不是 cell.t：cell.t 为了「极小值也看得见」做过下限夹取，
+ * 拿它当区间判据会让边界差一点点。 */
+const linkedCells = computed(() => {
+  const b = barRange.value;
+  if (!b) return [];
+  return heat.value.grid
+    .flat()
+    .filter((c) => !c.future && c.distanceM > 0 && c.distanceM >= b.loVal && c.distanceM <= b.hiVal);
 });
+const linkedSet = computed(() => new Set(linkedCells.value.map((c) => c.iso)));
+
 /* 悬停样式与月视图（ECharts heatmap）保持同一套 token，避免两种视图观感割裂：
  * - 描边用 emphasis（月视图 emphasis.itemStyle.borderColor 就是这个），琥珀色而非黑色；
  * - 浮层背景/边框/文字用 tipBg / tipBorder / tipText，与 ECharts tooltip 一致。 */
@@ -149,7 +162,7 @@ function cellTitle(cell) {
             v-for="cell in week"
             :key="cell.iso"
             class="dayheat-cell"
-            :class="{ future: cell.future }"
+            :class="{ future: cell.future, linked: linkedSet.has(cell.iso) }"
             :style="{ background: cell.future ? 'transparent' : cellColor(cell) }"
             :title="cellTitle(cell)"
             :data-date="cell.iso"
@@ -165,12 +178,13 @@ function cellTitle(cell) {
       <span class="muted small">
         {{ heat.empty ? t('calendar.dayEmpty') : t('calendar.daySummary', { n: heat.activeDays, dist: km(heat.totalDistanceM) }) }}
       </span>
-      <!-- 连续色带图例：一条渐变条 + 两端刻度文字，说明颜色是连续的而不是分档的 -->
-      <span class="dayheat-legend" aria-hidden="true">
-        <span class="muted small">{{ t('heatmap.less') }}</span>
-        <i class="dayheat-bar" :style="{ background: legendGradient }"></i>
-        <span class="muted small">{{ t('heatmap.more') }}</span>
-      </span>
+      <!-- 色带图例：与月视图共用同一个组件，两个视图观感一致 -->
+      <!-- 悬停格子时把该格里程传进去，指示器会跟着挪到色带对应位置（ECharts 的 series→visualMap 联动） -->
+      <HeatLegendBar
+        :max-m="heat.scaleMaxM"
+        :active-value-m="hover?.cell?.distanceM ?? null"
+        @hover="onLegendHover"
+      />
     </div>
 
     <!-- 悬停浮层：结构与文案对齐月视图的 ECharts tooltip（标题加粗 + 详情一行） -->
@@ -270,7 +284,11 @@ function cellTitle(cell) {
   outline: 1px solid transparent;
   outline-offset: 0;
 }
-.dayheat-cell:hover {
+/* 高亮态：鼠标悬停的格子和色带联动命中的格子，语义完全一样（都是「当前指向的这一格」），
+ * 所以共用同一套视觉——就以原来鼠标悬停的样式为准（只换描边颜色，不放大、不加光晕）。
+ * 放大/发光会改变格子的视觉尺寸，53 列网格里反而显得突兀。 */
+.dayheat-cell:hover,
+.dayheat-cell.linked {
   outline-color: var(--dayheat-hover, #ffb02e);
 }
 .dayheat-cell.future {
@@ -322,15 +340,5 @@ function cellTitle(cell) {
   flex-wrap: wrap;
   /* 与月份标签左边距对齐，右端与网格右端对齐 */
   padding-left: 34px;
-}
-.dayheat-legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.dayheat-legend .dayheat-bar {
-  width: 64px;
-  height: 10px;
-  border-radius: 5px;
 }
 </style>

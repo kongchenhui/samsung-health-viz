@@ -1,7 +1,7 @@
-// 日历「天视图」派生数据（GitHub 贡献图样式：近一年 × 按天热力）
+// 日历「日视图」派生数据（GitHub 贡献图样式：近一年 × 按日热力）
 //
 // 为什么单独一个文件、而不是塞进 data.js：
-// monthHeat 是「年 × 月」的 12 列矩阵，天视图是「周列 × 7 天」的二维网格，
+// monthHeat 是「年 × 月」的 12 列矩阵，日视图是「周列 × 7 天」的二维网格，
 // 两者的取整规则完全不同（月份只按日期字符串前缀分组；天要处理跨周对齐、未来日期、
 // 色阶分级）。混在 data.js 里会让那块变成一坨 if。
 //
@@ -79,7 +79,7 @@ function pickAnchor(rides, today, firstMs) {
 }
 
 /**
- * 近一年按天热力网格。
+ * 近一年按日热力网格。
  *
  * @param {Array<{date:string, distanceM?:number, durationMs?:number}>} rides 骑行记录
  * @param {object} [opts]

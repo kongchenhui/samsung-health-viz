@@ -106,7 +106,7 @@ const pb = computed(() => personalBests(rides.value));
 const heat = computed(() => monthHeat(rides.value));
 const recent = computed(() => [...rides.value].sort((a, b) => b.startMs - a.startMs).slice(0, 5));
 
-/* 日历视图：月热力（年 × 月）与天热力（近一年 × 日）二选一。
+/* 日历视图：月热力（年 × 月）与日热力（近一年 × 日）二选一。
  * 状态放在 store 里并落盘，下次打开保持上次的选择；这里不做本地 ref 兜底，
  * 否则多窗口（主窗口 + 独立设置窗口）会各记一份。 */
 const calendarViews = [

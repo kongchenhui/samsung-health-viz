@@ -25,7 +25,7 @@ export const store = reactive({
   stadiaKey: STADIA_ENV_KEY,
   themeMode: 'system', // 用户偏好：'system' | 'dark' | 'light'
   theme: 'dark', // 实际生效的主题：'dark' | 'light'（由 themeMode 推导，图表配色读这个）
-  // 日历视图：'month' 月热力（既有行为，作默认）/ 'day' 近一年天热力。
+  // 日历视图：'month' 月热力（既有行为，作默认）/ 'day' 近一年日热力。
   // 默认月视图而不是按数据量推断，保持升级后老用户看到的还是原来的样子
   calendarView: 'month',
   locale: 'zh', // 语言代码，见 src/locales/
@@ -251,7 +251,7 @@ export function setMapStyle(style, { fromTheme = false } = {}) {
 }
 
 /**
- * 切换日历视图（'month' 月热力 / 'day' 天热力）并立即落盘。
+ * 切换日历视图（'month' 月热力 / 'day' 日热力）并立即落盘。
  * 这里不做 watcher：视图只在用户点击时变，显式写盘比常驻 watch 更省，
  * 也避免与 mapStyle / mapDim 的防抖写盘叠在一起重复写同一个文件。
  */

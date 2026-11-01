@@ -136,7 +136,7 @@ export function monthHeat(rides) {
       return { key, month: i + 1, distanceM: v?.distanceM || 0, count: v?.count || 0 };
     }),
   }));
-  // 归一化上限与天视图同一套规则：取当前数据集的最大值
+  // 归一化上限与日视图同一套规则：取当前数据集的最大值
   const max = scaleCeiling(rows.flatMap((r) => r.months.map((m) => m.distanceM)));
   return { rows, max };
 }
