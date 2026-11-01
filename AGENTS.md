@@ -83,6 +83,7 @@ scripts/                      开发启动与自检脚本
 | `--window-kind=settings` | 主窗口直接渲染设置页（截图用；正式入口仍走独立窗口） |
 | `--data=<path>` | 启动后解析指定数据包 |
 | `--shot=<png>` / `--shot-delay=<ms>` / `--shot-page=<hash>` / `--shot-js=<js>` | 延时截图、跳路由、截图前执行 JS |
+| `--headless` | 窗口只在内存里渲染、不真正显示；配合 `--shot` 批量截图时不抢焦点、不打扰用户 |
 | `--lan-auto` | 启动即开启局域网接收器（不开界面收手机上传） |
 
 - 改 `main.mjs` / `preload.cjs` / `src/core/**` 必须重启 `pnpm dev`；只改渲染层用热更新。

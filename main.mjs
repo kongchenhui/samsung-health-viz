@@ -23,6 +23,9 @@ const shotPath = argValue('shot');
 const shotDelay = Number(argValue('shot-delay') || 6000);
 const shotPage = argValue('shot-page');
 const shotJs = argValue('shot-js'); // 截图前执行一段渲染进程 JS（调试/验证用）
+// 无头冒烟：窗口只在内存里渲染、不真正 show 出来，配合 --shot 批量截图时不抢焦点、不打扰正在用电脑的人。
+// 不影响渲染结果（capturePage 不要求窗口可见），正式运行不要加这个参数。
+const headless = process.argv.includes('--headless');
 
 // 调试/冒烟测试：隔离用户数据目录。必须在任何 app.getPath('userData') 调用之前执行，
 // 否则缓存/偏好会落到默认目录（下面的 cacheFile()/prefsFile() 都是惰性函数，此时尚未调用）。
@@ -409,7 +412,9 @@ function createWindow() {
     win.loadFile(path.join(__dirname, 'dist', 'renderer', 'index.html'));
   }
 
-  win.once('ready-to-show', () => win.show());
+  // --headless：不显示窗口（详见文件顶部 headless 的说明）。默认仍然正常显示。
+  if (headless) win.once('ready-to-show', () => console.log('[headless] 窗口保持隐藏'));
+  else win.once('ready-to-show', () => win.show());
 
   if (shotPath) {
     win.webContents.on('console-message', (...args) => {
