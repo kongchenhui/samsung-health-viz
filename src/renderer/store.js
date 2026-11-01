@@ -1,6 +1,7 @@
 // 全局状态与动作（不引入 pinia，首期够用）
 import { reactive, watch } from 'vue';
 import { requiresStadiaKey, TILES } from './lib/leaflet.js';
+import { setKnownYears } from './lib/data.js';
 import { LOCALE_CODES, setLocale, t, hasMessage } from './lib/i18n.js';
 import { pairedStyleFor } from './lib/theme-map.js';
 
@@ -291,6 +292,22 @@ export function setDataset(data) {
   store.yearFilter = 'all';
   location.hash = '#/career';
 }
+
+/* 数据集一变就登记年份集合：年份色要在 yearColor(date) 单参数调用下正确取色，
+ * 而数据集有 5 个写入点（首次启动、缓存刷新、解析完成、局域网直传、清空）。
+ * 在这里集中 watch 一次，比在每个写入点各调一次可靠。 */
+watch(
+  () => store.dataset?.rides,
+  (rides) => {
+    const years = new Set();
+    for (const r of rides || []) {
+      const y = Number(String(r?.date || '').slice(0, 4));
+      if (Number.isFinite(y)) years.add(y);
+    }
+    setKnownYears([...years]);
+  },
+  { immediate: true },
+);
 
 export async function boot() {
   try {

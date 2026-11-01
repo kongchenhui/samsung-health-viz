@@ -43,7 +43,9 @@ const option = computed(() => {
       data: props.items.map((i) => i.label),
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: c.axis, fontSize: 10.5 },
+      // 年份是开放集合：条数多时固定宽度下标签会互相重叠，
+      // 交给 ECharts 按可用宽度自动隐藏重叠标签（值仍在 tooltip 与柱顶标签里）
+      axisLabel: { color: c.axis, fontSize: 10.5, hideOverlap: true },
     },
     yAxis: { type: 'value', show: false },
     series: [

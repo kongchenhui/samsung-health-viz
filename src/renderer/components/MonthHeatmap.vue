@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import VChart from 'vue-echarts';
 import { use } from 'echarts/core';
 import { HeatmapChart } from 'echarts/charts';
@@ -15,13 +15,34 @@ use([HeatmapChart, GridComponent, TooltipComponent, VisualMapComponent, CanvasRe
 const props = defineProps({
   rows: { type: Array, default: () => [] }, // [{ year, months: [{ month, distanceM, count }] }]
   max: { type: Number, default: 1 },
+  // 默认只展示最近 N 年：行数开放（用户骑得越久年份越多），
+  // 全量渲染会让组件高度线性膨胀并撑高同一行的卡片，所以默认折叠。
+  defaultYears: { type: Number, default: 3 },
 });
+
+/* 年份折叠状态：默认看最近 N 年，用户可主动展开全部。
+ * 数据变化（换数据包、年份增减）时重置回默认，避免停在一个空扇区。 */
+const expanded = ref(false);
+watch(
+  () => props.rows.map((r) => r.year).join(','),
+  () => (expanded.value = false),
+);
+
+// rows 本身是升序（data.js 的 monthHeat 已排序），"最近"即末尾 N 年
+const visibleRows = computed(() => {
+  if (expanded.value || props.rows.length <= props.defaultYears) return props.rows;
+  return props.rows.slice(-props.defaultYears);
+});
+const hiddenCount = computed(() => Math.max(0, props.rows.length - visibleRows.value.length));
+// 按钮文案用的两个数字：折叠时提示「全部 N 个年份」，展开时提示「只看最近 N 年」
+const totalYears = computed(() => props.rows.length);
+const recentYears = computed(() => Math.min(props.defaultYears, props.rows.length));
 
 const months = computed(() => Array.from({ length: 12 }, (_, i) => t('month.' + (i + 1))));
 
-const years = computed(() => props.rows.map((r) => String(r.year)));
+const years = computed(() => visibleRows.value.map((r) => String(r.year)));
 const data = computed(() =>
-  props.rows.flatMap((row, yi) =>
+  visibleRows.value.flatMap((row, yi) =>
     row.months.map((m, xi) => ({
       value: [xi, yi, Number((m.distanceM / 1000).toFixed(1))],
       count: m.count,
@@ -29,7 +50,8 @@ const data = computed(() =>
   )
 );
 const maxKm = computed(() => Math.max(1, props.max / 1000));
-const height = computed(() => Math.max(130, props.rows.length * 54 + 54));
+// 高度按**可见**行数算，折叠后不再随年份无限增长
+const height = computed(() => Math.max(130, visibleRows.value.length * 54 + 54));
 
 const option = computed(() => {
   // 依赖 store.theme 与当前语言：切换后重算配色与文案
@@ -105,7 +127,29 @@ const option = computed(() => {
 </script>
 
 <template>
-  <div class="chart" :style="{ height: height + 'px' }">
-    <VChart class="echart" :option="option" autoresize />
+  <div class="heatmap-wrap">
+    <div class="chart" :style="{ height: height + 'px' }">
+      <VChart class="echart" :option="option" autoresize />
+    </div>
+    <!-- 年份多于默认展示数量时才出现：默认只看最近 N 年，全程由用户主动展开 -->
+    <button v-if="hiddenCount > 0 || expanded" type="button" class="link heatmap-more" @click="expanded = !expanded">
+      {{
+        expanded
+          ? t('career.calendarCollapse', { n: recentYears })
+          : t('career.calendarShowAll', { n: totalYears })
+      }}
+    </button>
   </div>
 </template>
+
+<style scoped>
+.heatmap-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.heatmap-more {
+  align-self: flex-end;
+}
+</style>

@@ -3,11 +3,49 @@ import { km, speedKmh, durationText } from './format.js';
 import { t } from './i18n.js';
 
 // 年份色：明暗主题共用同一套亮色（地图轨迹、图例、柱状图统一）
-export const YEAR_COLORS = { 2024: '#fbbf24', 2025: '#38bdf8', 2026: '#a78bfa' };
+//
+// 年份是开放集合（数据包可能含任意年份），所以不按具体年份建映射，
+// 而是按年份在当前数据集里的**升序下标**从调色板取色：
+// 任意跨度都能得到可区分的颜色，未登记的年份也不会退化成一个「像失效」的灰。
+//
+// 代价：同一年的颜色会随数据范围变化，所以不要在此基础上做「跨会话记住某年颜色」的功能。
+//
+// 调色板说明：取 Tailwind 400 色阶（与既有界面配色同源），沿色相环按最大间隔铺开，
+// 8 色是区分度与观感的平衡点——再多就会出现相邻年份颜色难辨的情况。
+// 全部为亮色（深浅主题通用，遵守「数据色两套主题共用」的约定）。
+export const YEAR_PALETTE = [
+  '#fbbf24', // amber-400   43°
+  '#38bdf8', // sky-400    198°
+  '#a78bfa', // violet-400 255°
+  '#86efac', // green-300  142°
+  '#a3e635', // lime-400    83°
+  '#2dd4bf', // teal-400   172°
+  '#f472b6', // pink-400   329°
+  '#e879f9', // fuchsia-400 292°
+];
+// 兜底：只在拿不到年份集合时使用（例如传入非法 date 或年份未登记）
 export const FALLBACK_COLOR = '#94a3b8';
 
+/* 当前数据集的年份集合（升序）。由 store 在数据集变化时登记一次，
+ * 让 yearColor(date) 保持单参数签名，既有调用点无需改动。 */
+let knownYears = [];
+
+/** 登记当前数据集的年份集合（任意顺序，内部去重并升序）；返回整理后的数组 */
+export function setKnownYears(years) {
+  const list = [...new Set((years || []).map(Number).filter((y) => Number.isFinite(y)))].sort((a, b) => a - b);
+  knownYears = list;
+  return list;
+}
+
+function colorForYear(year) {
+  const idx = knownYears.indexOf(year);
+  if (idx === -1) return FALLBACK_COLOR;
+  return YEAR_PALETTE[idx % YEAR_PALETTE.length];
+}
+
 export function yearColor(date) {
-  return YEAR_COLORS[Number(date.slice(0, 4))] || FALLBACK_COLOR;
+  if (!date) return FALLBACK_COLOR;
+  return colorForYear(Number(String(date).slice(0, 4)));
 }
 
 export function rideTooltipHtml(r) {

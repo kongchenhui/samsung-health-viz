@@ -116,6 +116,8 @@
       "personalBests": "Personal Bests",
       "calendar": "Ride Calendar",
       "calendarHint": "Darker = more distance that month",
+      "calendarShowAll": "Show all {n} years",
+      "calendarCollapse": "Last {n} years only",
       "recent": "Recent Rides",
       "allRecords": "All records →",
       "noTrackData": "No GPS tracks in this package, so the map stays empty"

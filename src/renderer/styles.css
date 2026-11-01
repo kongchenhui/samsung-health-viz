@@ -524,8 +524,11 @@ body.platform-darwin .titlebar {
 .pb-date {
   font-size: 11.5px;
   color: var(--muted);
-  width: 46px;
+  /* 带上年份后是「2024.08.15」，给足宽度并禁止换行，右对齐保持数字列整齐 */
+  width: 64px;
   text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- 日历热力 ---------- */
@@ -610,9 +613,11 @@ body.platform-darwin .titlebar {
   border-bottom: none;
 }
 .mini-date {
-  width: 82px;
+  /* 跨年时显示「2024.08.15」+ 时间，需要比纯 MM-DD 更宽 */
+  width: 104px;
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .mini-date em {
   font-style: normal;

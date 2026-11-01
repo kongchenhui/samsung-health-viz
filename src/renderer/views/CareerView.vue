@@ -105,6 +105,13 @@ const pb = computed(() => personalBests(rides.value));
 const heat = computed(() => monthHeat(rides.value));
 const recent = computed(() => [...rides.value].sort((a, b) => b.startMs - a.startMs).slice(0, 5));
 
+/* 短日期：跨年数据下必须带年份，否则「08-15」看不出是哪一年。
+ * 同一列表里统一带年份——混着「2027.03.15」和「03.15」会比全带更难读。 */
+function shortDate(date) {
+  if (!date) return '—';
+  return `${date.slice(0, 4)}.${date.slice(5, 10).replace('-', '.')}`;
+}
+
 function setYear(y) {
   store.yearFilter = String(y);
   clusterKey.value = 'all';
@@ -260,7 +267,7 @@ function openRide(id) {
             >
               <span class="pb-label">{{ p.label }}</span>
               <b>{{ p.value }}</b>
-              <span class="pb-date">{{ p.ride.date.slice(5, 10) }}</span>
+              <span class="pb-date">{{ shortDate(p.ride.date) }}</span>
             </li>
           </ul>
         </div>
@@ -290,7 +297,7 @@ function openRide(id) {
             @keydown.enter="openRide(r.id)"
             @keydown.space.prevent="openRide(r.id)"
           >
-            <span class="mini-date">{{ r.date.slice(5, 10) }} <em>{{ r.start.slice(11, 16) }}</em></span>
+            <span class="mini-date">{{ shortDate(r.date) }} <em>{{ r.start.slice(11, 16) }}</em></span>
             <span class="mini-main">{{ km(r.distanceM) }} · {{ durationText(r.durationMs) }}</span>
             <span class="mini-speed">{{ r.avgSpeedMps ? speedKmh(r.avgSpeedMps) : '—' }}</span>
           </li>

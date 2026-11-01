@@ -116,6 +116,8 @@
       "personalBests": "个人最佳",
       "calendar": "骑行日历",
       "calendarHint": "颜色越深，当月里程越多",
+      "calendarShowAll": "显示全部 {n} 个年份",
+      "calendarCollapse": "只看最近 {n} 年",
       "recent": "最近骑行",
       "allRecords": "全部记录 →",
       "noTrackData": "本数据包暂无 GPS 轨迹，地图无法绘制"
