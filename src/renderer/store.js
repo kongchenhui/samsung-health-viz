@@ -25,6 +25,9 @@ export const store = reactive({
   stadiaKey: STADIA_ENV_KEY,
   themeMode: 'system', // 用户偏好：'system' | 'dark' | 'light'
   theme: 'dark', // 实际生效的主题：'dark' | 'light'（由 themeMode 推导，图表配色读这个）
+  // 日历视图：'month' 月热力（既有行为，作默认）/ 'day' 近一年天热力。
+  // 默认月视图而不是按数据量推断，保持升级后老用户看到的还是原来的样子
+  calendarView: 'month',
   locale: 'zh', // 语言代码，见 src/locales/
   // 需要 API Key 的底图：{ visible, style, fallback }，由 StadiaKeyDialog 渲染
   stadiaKeyDialog: { visible: false, style: '', fallback: '' },
@@ -47,6 +50,7 @@ function saveMapPrefs(immediate = false) {
         mapStyleAuto: store.mapStyleAuto,
         theme: store.themeMode,
         locale: store.locale,
+        calendarView: store.calendarView,
       });
       if (p?.catch) p.catch(() => {});
     } catch {
@@ -246,6 +250,18 @@ export function setMapStyle(style, { fromTheme = false } = {}) {
   }
 }
 
+/**
+ * 切换日历视图（'month' 月热力 / 'day' 天热力）并立即落盘。
+ * 这里不做 watcher：视图只在用户点击时变，显式写盘比常驻 watch 更省，
+ * 也避免与 mapStyle / mapDim 的防抖写盘叠在一起重复写同一个文件。
+ */
+export function setCalendarView(view) {
+  if (view !== 'month' && view !== 'day') return;
+  if (view === store.calendarView) return;
+  store.calendarView = view;
+  saveMapPrefs(true);
+}
+
 /** 手动打开 Key 输入框（「数据」页配置/更换 Key 用） */
 export function openStadiaKeyDialog(style = store.mapStyle) {
   store.stadiaKeyDialog = { visible: true, style, fallback: '' };
@@ -345,6 +361,10 @@ export async function boot() {
       if (LOCALE_CODES.includes(data.locale)) {
         store.locale = data.locale;
         setLocale(data.locale);
+      }
+      // 日历视图：同样只认合法枚举，老配置缺字段或值被改坏时保持默认月视图
+      if (data.calendarView === 'month' || data.calendarView === 'day') {
+        store.calendarView = data.calendarView;
       }
     }
   } catch (e) {
@@ -610,6 +630,10 @@ export function applyExternalPrefs(prefs) {
   if (LOCALE_CODES.includes(prefs.locale) && prefs.locale !== store.locale) {
     store.locale = prefs.locale;
     setLocale(prefs.locale);
+  }
+  // 日历视图：另一窗口切了视图本窗口要跟上；不写盘（本窗口只是接收方，写盘会触发回环广播）
+  if (prefs.calendarView === 'month' || prefs.calendarView === 'day') {
+    store.calendarView = prefs.calendarView;
   }
 }
 

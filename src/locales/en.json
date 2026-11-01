@@ -89,6 +89,16 @@
       "11": "Nov",
       "12": "Dec"
     },
+    "calendar": {
+      "viewMonth": "Month",
+      "viewDay": "Day",
+      "dayHint": "Daily distance over the last year — darker means farther",
+      "daySummary": "{n} active days in the last year · {dist}",
+      "dayEmpty": "No rides in the last year",
+      "dayTip": "{dist} · {n} rides",
+      "dayTip_one": "{dist} · 1 ride",
+      "dayNoRide": "No ride"
+    },
     "career": {
       "title": "Cycling Career",
       "subtitle": "{range} · {count} rides · {tracks} tracks · avg {speed}",
@@ -358,7 +368,8 @@
         "ms": "{m} min {s} s",
         "m": "{m} min",
         "s": "{s} s"
-      }
+      },
+      "weekStart": 0
     }
   },
   "main": {

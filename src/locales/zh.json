@@ -89,6 +89,16 @@
       "11": "11月",
       "12": "12月"
     },
+    "calendar": {
+      "viewMonth": "月视图",
+      "viewDay": "天视图",
+      "dayHint": "近一年每日里程，颜色越深当日骑得越远",
+      "daySummary": "近一年 {n} 天有骑行 · {dist}",
+      "dayEmpty": "近一年没有骑行记录",
+      "dayTip": "{dist} · {n} 次",
+      "dayTip_one": "{dist} · 1 次",
+      "dayNoRide": "没有骑行"
+    },
     "career": {
       "title": "骑行生涯",
       "subtitle": "{range} · {count} 次骑行 · {tracks} 条轨迹 · 平均 {speed}",
@@ -358,7 +368,8 @@
         "ms": "{m} 分 {s} 秒",
         "m": "{m} 分",
         "s": "{s} 秒"
-      }
+      },
+      "weekStart": 1
     }
   },
   "main": {

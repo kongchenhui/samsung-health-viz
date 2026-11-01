@@ -183,6 +183,9 @@ function writePrefs(input) {
     data.stadiaKey = input.stadiaKey.trim();
   }
   if (typeof input?.mapStyleAuto === 'boolean') data.mapStyleAuto = input.mapStyleAuto;
+  // 日历视图也走白名单：这个字段会被写进 settings.json 并经 broadcastPrefs() 广播给所有窗口，
+  // 若放行任意字符串，一个写错的值会长期留在用户配置里，等后续版本再改枚举时既读不回来也没法回退
+  if (input?.calendarView === 'month' || input?.calendarView === 'day') data.calendarView = input.calendarView;
   if (input?.theme === 'system' || input?.theme === 'dark' || input?.theme === 'light') data.theme = input.theme;
   if (input?.locale === 'zh' || input?.locale === 'en') data.locale = input.locale;
   try {

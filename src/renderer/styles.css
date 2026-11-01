@@ -1629,9 +1629,25 @@ body.theme-light .settings-hint.warn {
   grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
   gap: 16px;
 }
+/* 日历卡会被拉伸到「最近骑行」的高度（天视图比月视图矮），
+ * 把热力图在卡内垂直居中，多出来的空间上下均分，而不是全堆在底部看着像没渲染完。 */
+.calendar-card {
+  display: flex;
+  flex-direction: column;
+}
+.calendar-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
 @media (max-width: 1400px) {
   .career-bottom {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .calendar-body {
+    justify-content: flex-start;
   }
 }
 

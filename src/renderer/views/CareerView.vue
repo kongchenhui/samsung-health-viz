@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { store, setMapStyle } from '../store.js';
+import { store, setMapStyle, setCalendarView } from '../store.js';
 import { careerStats, yearStats, personalBests, monthHeat, yearColor, rideTooltipHtml } from '../lib/data.js';
 import { km, speedKmh, durationText } from '../lib/format.js';
 import { MAP_STYLE_OPTIONS } from '../lib/leaflet.js';
@@ -11,6 +11,7 @@ import StatCard from '../components/StatCard.vue';
 import MapPanel from '../components/MapPanel.vue';
 import BarChart from '../components/BarChart.vue';
 import MonthHeatmap from '../components/MonthHeatmap.vue';
+import DayHeatmap from '../components/DayHeatmap.vue';
 
 const router = useRouter();
 
@@ -104,6 +105,14 @@ const activeClusterLabel = computed(() => {
 const pb = computed(() => personalBests(rides.value));
 const heat = computed(() => monthHeat(rides.value));
 const recent = computed(() => [...rides.value].sort((a, b) => b.startMs - a.startMs).slice(0, 5));
+
+/* 日历视图：月热力（年 × 月）与天热力（近一年 × 日）二选一。
+ * 状态放在 store 里并落盘，下次打开保持上次的选择；这里不做本地 ref 兜底，
+ * 否则多窗口（主窗口 + 独立设置窗口）会各记一份。 */
+const calendarViews = [
+  { key: 'month', label: 'calendar.viewMonth' },
+  { key: 'day', label: 'calendar.viewDay' },
+];
 
 /* 短日期：跨年数据下必须带年份，否则「08-15」看不出是哪一年。
  * 同一列表里统一带年份——混着「2027.03.15」和「03.15」会比全带更难读。 */
@@ -275,12 +284,32 @@ function openRide(id) {
     </div>
 
     <div class="career-bottom">
-      <div class="card">
+      <div class="card calendar-card">
         <div class="card-head">
           <h3>{{ t('career.calendar') }}</h3>
-          <span class="muted small">{{ t('career.calendarHint') }}</span>
+          <div class="card-tools">
+            <span class="muted small">
+              {{ store.calendarView === 'day' ? t('calendar.dayHint') : t('career.calendarHint') }}
+            </span>
+            <div class="segmented" role="group" :aria-label="t('career.calendar')">
+              <button
+                v-for="v in calendarViews"
+                :key="v.key"
+                type="button"
+                class="chip"
+                :class="{ active: store.calendarView === v.key }"
+                :aria-pressed="store.calendarView === v.key"
+                @click="setCalendarView(v.key)"
+              >
+                {{ t(v.label) }}
+              </button>
+            </div>
+          </div>
         </div>
-        <MonthHeatmap :rows="heat.rows" :max="heat.max" />
+        <div class="calendar-body">
+          <MonthHeatmap v-if="store.calendarView === 'month'" :rows="heat.rows" :max="heat.max" />
+          <DayHeatmap v-else :rides="rides" />
+        </div>
       </div>
       <div class="card">
         <div class="card-head">

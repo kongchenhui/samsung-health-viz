@@ -64,7 +64,7 @@ scripts/                      开发启动与自检脚本
 ## Git 与发布
 
 - 暂存、提交、推送、打 tag、改写历史都**必须由用户单独明确指示**；不要主动执行，也不要沿用上一次授权。
-- 提交作者使用 GitHub noreply 邮箱；commit message 和 Release 说明不得包含真实个人数据。
+- commit message 和 Release 说明不得包含真实个人数据。
 - 发布流程：
   1. 改 `package.json` 的 `version`，同时改 `android/app/build.gradle` 的 `versionCode` / `versionName`；
   2. 新增 `docs/release-notes/vX.Y.Z.md`；

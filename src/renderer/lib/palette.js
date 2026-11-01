@@ -17,6 +17,12 @@ export function chartColors() {
     heatLowLabel: light ? '#4a586c' : '#aeb9c9',
     heatHiLabel: 'rgba(10, 14, 20, 0.8)',
     heatRange: ['rgba(255, 176, 46, 0.08)', 'rgba(255, 176, 46, 0.35)', 'rgba(255, 176, 46, 0.7)', '#ffb02e'],
+    // 天视图（GitHub 贡献图样式）四档色阶：明暗主题共用同一组琥珀色，
+    // 只有「没有骑行」的底色随主题变——深色底上浅灰块发脏，浅色底上白块会消失。
+    // 悬停描边与浮层不另配色，直接用下面月的 emphasis / tip* 一套，
+    // 这样月视图（ECharts）和天视图（CSS）的悬停观感完全一致。
+    heatDay: ['rgba(255, 176, 46, 0.2)', 'rgba(255, 176, 46, 0.45)', 'rgba(255, 176, 46, 0.72)', '#ffb02e'],
+    heatDayEmpty: light ? 'rgba(20, 40, 80, 0.075)' : 'rgba(255, 255, 255, 0.055)',
     emphasis: light ? '#c2760a' : '#ffd27a',
     // 图表系列色：明暗主题共用同一套亮色（与深色主题一致）
     series: {

@@ -9,7 +9,7 @@
 | 桌面壳 | Electron 45（主进程 ESM） |
 | 渲染 | Vue 3（SFC + `<script setup>`）+ vue-router（hash 模式） |
 | 构建 | Vite 8 + `@vitejs/plugin-vue` |
-| 图表 | ECharts 6 + vue-echarts（折线、柱状、日历热力） |
+| 图表 | ECharts 6 + vue-echarts（折线、柱状、日历热力）；日历天视图是纯 CSS grid 渲染，不走 ECharts |
 | 地图 | Leaflet 1.9（高德暗色/标准/卫星、Stadia 全系 9 款、Esri 卫星、OSM、离线无底图；轨迹描边 + 底图淡化 + 全屏） |
 | 数据 | `adm-zip` 直接读取用户选择的 ZIP；CSV 自行解析（三星导出格式：两行文件头 + 行尾空字段） |
 | 手机直传 | Android App（纯 Java、无第三方依赖）：选目录 → 打包 ZIP → 局域网 HTTP 上传；桌面端内置接收器（HTTP + UDP 广播发现，`src/core/lan-upload.mjs`） |
@@ -31,11 +31,12 @@ samsung-health-viz/
 │   ├── main.js  App.vue  router.js  store.js  styles.css
 │   ├── lib/                 # 纯逻辑：format / data 派生统计 / leaflet 底图 / palette / theme-map / i18n / cities
 │   ├── data/cities/         # 城市坐标：一个国家一个 JSON（cn.json 覆盖国内地级行政区与港澳台）
-│   ├── components/          # TitleBar、MapPanel、LineChart、BarChart、MonthHeatmap…
+│   ├── components/          # TitleBar、MapPanel、LineChart、BarChart、MonthHeatmap、DayHeatmap（天视图）…
 │   └── views/               # Welcome / Career / Rides / RideDetail / Settings（独立设置窗口）
 ├── scripts/                 # 开发与自检脚本
 │   ├── dev.mjs              #   开发启动器（Vite + Electron）
 │   ├── check-coord-sys.mjs  #   坐标判定自检（改判定逻辑后先跑它）
+│   ├── check-calendar.mjs   #   日历天视图自检（跨周对齐 / 未来占位 / 色阶切档）
 │   └── check-lan-upload.mjs #   局域网直传自检（伪造导出包 → 上传 → 解析全链路）
 ├── android/                 # 手机直传 App（Java + Gradle，纯系统 API）
 ├── docs/screenshots/        # 界面截图（虚构演示数据，已脱敏）
@@ -120,7 +121,7 @@ OSM/卫星（WGS-84）与 GCJ-02 轨迹 → 反算回 WGS-84。详见 `src/rende
 地图右上角「全屏」把地图卡片铺满内容区（保留顶部标题栏与导航），底图/淡化/年份与区域筛选照常可用，
 按 `Esc` 或再点一次按钮退出；进出全屏与容器尺寸变化都会重新测量并回到轨迹视野。
 
-底图主题、「底图淡化」和 Stadia API Key 保存在 `<userData>/settings.json`
+底图主题、「底图淡化」、日历视图（月视图 / 天视图）和 Stadia API Key 保存在 `<userData>/settings.json`
 （macOS 为 `~/Library/Application Support/Samsung Health Viz/settings.json`）；
 `?map=` / `?dim=` 调试参数只对本次启动生效，不会覆盖已保存的偏好。
 
@@ -216,8 +217,9 @@ macOS 的 dmg 只能在 macOS 上构建（系统限制）。
 ## 自检与调试
 
 ```bash
-pnpm check          # 坐标判定 + 局域网接收器（含「伪造导出包 → 上传 → 真实解析」全链路）
+pnpm check          # 坐标判定 + 日历天视图 + 局域网接收器（含「伪造导出包 → 上传 → 真实解析」全链路）
 pnpm check:coord    # 只跑坐标判定
+pnpm check:calendar # 只跑日历天视图（跨周对齐 / 未来占位 / 分位数色阶 / 闰年 / 锚点回退）
 pnpm check:lan      # 只跑局域网直传
 ```
 
