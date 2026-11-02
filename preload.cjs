@@ -42,8 +42,17 @@ contextBridge.exposeInMainWorld('api', {
   savePrefs: (data) => ipcRenderer.invoke('prefs:save', data),
   // 主题 / 语言：切换后同步主进程（nativeTheme、原生标题栏、应用菜单、对话框文案）
   applyTheme: (mode) => ipcRenderer.invoke('theme:apply', mode),
-  // 设置页「检查更新」：走主进程的 electron-updater 流程
+  // 自动更新：状态查询 / 手动检查 / 用户确认后下载 / 重启安装。
+  // 检测是静默的，结果与下载进度都通过 update:state 推给所有窗口（设置页与主窗口红点共用）
+  updateStatus: () => ipcRenderer.invoke('update:status'),
   checkUpdates: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateState: (cb) => {
+    const handler = (_e, state) => cb(state);
+    ipcRenderer.on('update:state', handler);
+    return () => ipcRenderer.removeListener('update:state', handler);
+  },
   // 多窗口同步：另一窗口改了偏好 / 数据包后主进程会广播
   onPrefsChanged: (cb) => {
     const handler = (_e, prefs) => cb(prefs);

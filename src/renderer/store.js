@@ -599,6 +599,80 @@ export function setupLanEvents() {
   };
 }
 
+/* ---------------- 自动更新 ---------------- */
+
+// 主进程是更新状态的唯一真源，这里只做响应式镜像：
+// 设置页「关于」显示状态 / 进度，主窗口标题栏用它决定要不要亮红点。
+export const update = reactive({
+  phase: 'idle', // idle | checking | available | downloading | downloaded | up-to-date | error | dev
+  version: '',
+  percent: 0,
+  transferred: 0,
+  total: 0,
+  bytesPerSecond: 0,
+  error: '',
+  currentVersion: '',
+  releasePage: '',
+  packaged: false,
+  canAutoInstall: false,
+});
+
+/** 把主进程推来的状态合并进 store（只认已定义的字段，避免脏数据污染 UI） */
+export function applyUpdateState(state) {
+  if (!state || typeof state !== 'object') return;
+  if (typeof state.phase === 'string') update.phase = state.phase;
+  if (typeof state.version === 'string') update.version = state.version;
+  if (typeof state.error === 'string') update.error = state.error;
+  if (typeof state.currentVersion === 'string') update.currentVersion = state.currentVersion;
+  if (typeof state.releasePage === 'string') update.releasePage = state.releasePage;
+  if (typeof state.packaged === 'boolean') update.packaged = state.packaged;
+  if (typeof state.canAutoInstall === 'boolean') update.canAutoInstall = state.canAutoInstall;
+  for (const key of ['percent', 'transferred', 'total', 'bytesPerSecond']) {
+    const value = Number(state[key]);
+    if (Number.isFinite(value)) update[key] = value;
+  }
+}
+
+/** 设置页 / 主窗口挂载时拉一次快照，避免错过挂载前的广播 */
+export async function refreshUpdateStatus() {
+  try {
+    applyUpdateState(await window.api.updateStatus());
+  } catch { /* 调用失败时保持 idle，不影响其它功能 */ }
+}
+
+/** 用户点「检查更新」：状态切换由主进程广播，这里不自己猜状态 */
+export async function checkForUpdates() {
+  try {
+    applyUpdateState(await window.api.checkUpdates());
+  } catch (e) {
+    showToast(t('toast.updateCheckFailed', { error: e?.message || e }), 'error', 5000);
+  }
+}
+
+/** 确认下载（Windows / Linux 可用；macOS 等平台主进程会拒绝） */
+export async function downloadUpdate() {
+  try {
+    const res = await window.api.downloadUpdate();
+    if (res?.ok === false && res.reason === 'unsupported') showToast(t('toast.updateUnsupported'), 'info', 4200);
+  } catch (e) {
+    showToast(t('toast.updateDownloadFailed', { error: e?.message || e }), 'error', 5000);
+  }
+}
+
+/** 重启并安装；不支持自动安装的平台会改为打开发布页 */
+export async function installUpdate() {
+  try {
+    await window.api.installUpdate();
+  } catch (e) {
+    showToast(t('toast.updateInstallFailed', { error: e?.message || e }), 'error', 5000);
+  }
+}
+
+/** 订阅主进程广播的更新状态变化 */
+export function setupUpdateEvents() {
+  return window.api.onUpdateState((state) => applyUpdateState(state));
+}
+
 /* ---------------- 多窗口同步（主窗口 ↔ 独立设置窗口） ---------------- */
 
 /**

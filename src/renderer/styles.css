@@ -1849,6 +1849,7 @@ body.map-fs .view {
 /* ---------- 标题栏图标按钮（主题 / 语言切换） ---------- */
 .icon-btn {
   -webkit-app-region: no-drag;
+  position: relative; /* 更新红点定位基准 */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1875,6 +1876,72 @@ body.map-fs .view {
   min-width: 32px;
   padding: 0 7px;
   letter-spacing: 0.02em;
+}
+
+/* ---------- 自动更新（检测静默，仅红点提示 + 设置页「关于」） ----------
+ * 红点同时用于主窗口设置齿轮和设置侧边栏「关于」：有新版本 / 已下载待安装时出现，
+ * 点击进入设置页下载；不做任何弹窗或 Toast，避免打断用户当前操作。
+ */
+.icon-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 2px rgba(8, 11, 18, 0.6);
+  pointer-events: none;
+}
+.nav-dot {
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+}
+/* 侧边栏「关于」是选中态（橙色底）时红点需要更明显的反差 */
+.settings-nav-item.active .nav-dot {
+  box-shadow: 0 0 0 2px rgba(26, 18, 6, 0.35);
+}
+.update-card .card-head {
+  margin-bottom: 10px;
+}
+.update-state {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.update-hint {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.update-card.is-available .update-state,
+.update-card.is-downloaded .update-state {
+  color: var(--accent);
+}
+.update-card.is-error .update-state {
+  color: var(--red);
+}
+.update-progress {
+  margin: 2px 0 14px;
+}
+.update-progress .progress-track {
+  height: 8px;
+}
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.badge.accent {
+  color: var(--accent);
+  border-color: rgba(255, 176, 46, 0.45);
+  background: rgba(255, 176, 46, 0.12);
 }
 
 /* ---------- 亮色主题 ---------- */
@@ -1966,6 +2033,26 @@ body.theme-light .split-bar {
 body.theme-light .progress-track,
 body.theme-light .lan-bar {
   background: rgba(20, 40, 80, 0.1);
+}
+/* 更新红点：浅色标题栏上用更深的红 + 白描边才看得清 */
+body.theme-light .icon-dot,
+body.theme-light .nav-dot {
+  background: #dc2626;
+}
+body.theme-light .icon-dot {
+  box-shadow: 0 0 0 2px rgba(252, 253, 255, 0.9);
+}
+body.theme-light .update-card.is-available .update-state,
+body.theme-light .update-card.is-downloaded .update-state {
+  color: #b45309;
+}
+body.theme-light .update-card.is-error .update-state {
+  color: #b91c1c;
+}
+body.theme-light .badge.accent {
+  color: #b45309;
+  border-color: rgba(180, 83, 9, 0.35);
+  background: rgba(245, 158, 11, 0.14);
 }
 body.theme-light .dropzone {
   border-color: #b7c3d4;

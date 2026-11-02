@@ -8,6 +8,8 @@ import {
   setupLanEvents,
   refreshLanStatus,
   setupCrossWindowSync,
+  setupUpdateEvents,
+  refreshUpdateStatus,
 } from './store.js';
 import TitleBar from './components/TitleBar.vue';
 import ProgressOverlay from './components/ProgressOverlay.vue';
@@ -78,6 +80,9 @@ onMounted(async () => {
   // 局域网直传事件是全局的：无论当前在哪个页面，手机上传完成后都能收到并刷新数据
   unsubs.push(setupLanEvents());
   refreshLanStatus();
+  // 自动更新：主进程静默检测，发现新版本只更新状态（主窗口红点 / 设置页关于），不弹窗
+  unsubs.push(setupUpdateEvents());
+  refreshUpdateStatus();
   if (!isSettingsWindow) {
     window.addEventListener('dragover', onDragOver);
     window.addEventListener('drop', onDrop);

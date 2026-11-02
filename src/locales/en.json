@@ -37,6 +37,29 @@
       "checkUpdates": "Check for updates",
       "checking": "Checking…",
       "openRelease": "Open release page",
+      "update": {
+        "idle": "Not checked yet",
+        "checking": "Checking for updates…",
+        "available": "Version {version} is available",
+        "confirmHint": "Confirm to start downloading; you can restart to install when it finishes.",
+        "manualHint": "The macOS build is unsigned, so auto-install is unavailable. Download the installer from the release page.",
+        "downloading": "Downloading {version}",
+        "downloaded": "Update {version} downloaded",
+        "installHint": "Restart the app to install, or quit later and it will install on exit.",
+        "upToDate": "Version {version} is up to date",
+        "failed": "Update failed: {error}",
+        "dev": "Update checks are disabled in development mode; they only run in a packaged build via GitHub Releases.",
+        "download": "Download update",
+        "install": "Restart & install",
+        "badgeAvailable": "Update available",
+        "badgeDownloaded": "Ready to install",
+        "badgeChecking": "Checking",
+        "badgeLatest": "Up to date",
+        "badgeError": "Failed",
+        "badgeDev": "Dev mode",
+        "dotAvailable": "Version {version} is available — click to open settings and download",
+        "dotDownloaded": "Update downloaded — click to open settings and install"
+      },
       "build": "Build",
       "buildInfo": "Electron {electron} · Chrome {chrome}",
       "mode": {
@@ -342,7 +365,11 @@
       "receiveError": "Receive error",
       "parseErrorPlain": "Parse failed",
       "tileErrorKeyed": "Basemap failed to load: check that the Stadia API key is valid and your plan supports this basemap",
-      "tileError": "Basemap failed to load — check your network and retry later"
+      "tileError": "Basemap failed to load — check your network and retry later",
+      "updateCheckFailed": "Update check failed: {error}",
+      "updateDownloadFailed": "Update download failed: {error}",
+      "updateInstallFailed": "Update install failed: {error}",
+      "updateUnsupported": "This platform does not support auto-install; download the installer from the release page"
     },
     "map": {
       "fullscreen": "View fullscreen",
@@ -397,38 +424,6 @@
     "lan": {
       "startFailed": "Failed to start the LAN receiver: {error}",
       "notStarted": "Receiver is not running"
-    },
-    "update": {
-      "newVersion": {
-        "title": "Update Available",
-        "message": "Samsung Health Viz {version} has been released",
-        "detail": "Auto-install is not available on macOS yet (the app is unsigned). Open the release page to download the installer manually."
-      },
-      "ready": {
-        "title": "Update Ready",
-        "message": "Samsung Health Viz {version} has been downloaded",
-        "detail": "Restart the app to install the new version."
-      },
-      "latest": {
-        "title": "Up to Date",
-        "message": "Version {version} is the latest"
-      },
-      "failed": {
-        "title": "Update Check Failed",
-        "message": "Unable to check for updates right now"
-      },
-      "dev": {
-        "title": "Development Mode",
-        "message": "Update checks are disabled in development mode",
-        "detail": "Update checks only run in a packaged build via GitHub Releases."
-      }
-    },
-    "button": {
-      "openRelease": "Open release page",
-      "later": "Later",
-      "restartNow": "Restart now",
-      "ok": "OK",
-      "close": "Close"
     }
   }
 }

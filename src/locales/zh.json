@@ -37,6 +37,29 @@
       "checkUpdates": "检查更新",
       "checking": "检查中…",
       "openRelease": "打开发布页",
+      "update": {
+        "idle": "尚未检查更新",
+        "checking": "正在检查更新…",
+        "available": "发现新版本 v{version}",
+        "confirmHint": "确认后开始下载，下载完成后可重启安装。",
+        "manualHint": "macOS 版未签名，暂不支持自动安装，请到发布页手动下载安装包。",
+        "downloading": "正在下载 v{version}",
+        "downloaded": "更新 v{version} 已下载",
+        "installHint": "重启应用即可安装；也可以稍后退出应用时自动安装。",
+        "upToDate": "当前版本 v{version} 已是最新",
+        "failed": "更新失败：{error}",
+        "dev": "开发模式下不检查更新，用构建后的安装包运行才会检查 GitHub Release。",
+        "download": "下载更新",
+        "install": "重启并安装",
+        "badgeAvailable": "有新版本",
+        "badgeDownloaded": "待安装",
+        "badgeChecking": "检查中",
+        "badgeLatest": "已是最新",
+        "badgeError": "更新失败",
+        "badgeDev": "开发模式",
+        "dotAvailable": "发现新版本 v{version}，点击前往设置下载",
+        "dotDownloaded": "更新已下载，点击前往设置安装"
+      },
       "build": "构建",
       "buildInfo": "Electron {electron} · Chrome {chrome}",
       "mode": {
@@ -342,7 +365,11 @@
       "receiveError": "接收出错",
       "parseErrorPlain": "解析失败",
       "tileErrorKeyed": "底图加载失败：请检查 Stadia API Key 是否有效，或套餐/额度是否支持该底图",
-      "tileError": "底图加载失败，请检查网络或稍后重试"
+      "tileError": "底图加载失败，请检查网络或稍后重试",
+      "updateCheckFailed": "检查更新失败：{error}",
+      "updateDownloadFailed": "下载更新失败：{error}",
+      "updateInstallFailed": "安装更新失败：{error}",
+      "updateUnsupported": "当前平台不支持自动安装更新，请到发布页手动下载"
     },
     "map": {
       "fullscreen": "全屏查看",
@@ -397,38 +424,6 @@
     "lan": {
       "startFailed": "局域网接收器启动失败：{error}",
       "notStarted": "接收器未启动"
-    },
-    "update": {
-      "newVersion": {
-        "title": "发现新版本",
-        "message": "Samsung Health Viz {version} 已发布",
-        "detail": "macOS 版暂不支持自动安装（应用未签名），请打开发布页手动下载安装包。"
-      },
-      "ready": {
-        "title": "更新已就绪",
-        "message": "Samsung Health Viz {version} 已下载",
-        "detail": "重启应用后自动安装新版本。"
-      },
-      "latest": {
-        "title": "已是最新版本",
-        "message": "当前版本 {version} 已是最新"
-      },
-      "failed": {
-        "title": "检查更新失败",
-        "message": "暂时无法检查更新"
-      },
-      "dev": {
-        "title": "开发模式",
-        "message": "开发模式下不检查更新",
-        "detail": "用构建后的安装包运行时才会检查 GitHub Release。"
-      }
-    },
-    "button": {
-      "openRelease": "打开发布页",
-      "later": "稍后",
-      "restartNow": "立即重启",
-      "ok": "好",
-      "close": "关闭"
     }
   }
 }

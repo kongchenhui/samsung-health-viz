@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { store } from '../store.js';
+import { store, update } from '../store.js';
 import { t } from '../lib/i18n.js';
 
 const route = useRoute();
@@ -21,9 +21,18 @@ const packageLabel = computed(() => {
 });
 const exportLabel = computed(() => store.dataset?.meta?.exportTime?.slice(0, 10) || '');
 
-// 设置统一走路由拦截：主窗口 push /settings 后由 router.beforeEach 打开独立设置窗口
+// 主进程静默检测到新版本（或已下载待安装）时，设置入口亮红点：这里不做任何弹窗提示
+const updateReady = computed(() => update.phase === 'available' || update.phase === 'downloaded');
+const settingsTitle = computed(() => {
+  if (update.phase === 'available') return t('settings.update.dotAvailable', { version: update.version || '—' });
+  if (update.phase === 'downloaded') return t('settings.update.dotDownloaded');
+  return t('settings.title');
+});
+
+// 设置统一走路由拦截：主窗口 push /settings 后由 router.beforeEach 打开独立设置窗口。
+// 有更新时直达「关于」分栏——下载/安装入口都在那里
 function openSettings() {
-  router.push('/settings');
+  router.push(updateReady.value ? '/settings?tab=about' : '/settings');
 }
 </script>
 
@@ -77,10 +86,12 @@ function openSettings() {
       <button
         class="icon-btn"
         :class="{ active: route.name === 'settings' }"
-        :title="t('settings.title')"
-        :aria-label="t('settings.title')"
+        :title="settingsTitle"
+        :aria-label="settingsTitle"
         @click="openSettings"
       >
+        <!-- 有新版本 / 已下载待安装：气泡红点，点击直达设置页「关于」 -->
+        <span v-if="updateReady" class="icon-dot" aria-hidden="true"></span>
         <svg
           viewBox="0 0 24 24"
           width="16"

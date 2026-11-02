@@ -548,11 +548,14 @@ function registerIpc() {
     dev: !!process.env.VITE_DEV_SERVER_URL,
   }));
 
-  // 设置页「检查更新」：复用与菜单相同的检查流程（开发模式弹说明，正式包走 electron-updater）
+  // 自动更新：界面全部在设置页「关于」里，主进程只负责状态机与 electron-updater 调用
+  ipcMain.handle('update:status', () => updateStatus());
   ipcMain.handle('update:check', () => {
-    checkUpdatesManually();
-    return { ok: true };
+    startUpdateCheck(true);
+    return updateStatus();
   });
+  ipcMain.handle('update:download', () => downloadUpdate());
+  ipcMain.handle('update:install', () => installUpdate());
 
   // 读取上次缓存的数据包（首次启动返回 null）
   ipcMain.handle('data:load', () => {
@@ -724,96 +727,177 @@ function registerIpc() {
 
 /* ---------- 自动更新（electron-updater + GitHub Release） ---------- */
 const RELEASE_PAGE = 'https://github.com/kongchenhui/samsung-health-viz/releases/latest';
-// macOS 未签名时 Squirrel.Mac 无法校验并安装更新，只能提示去发布页手动下载；
-// Windows（NSIS）与 Linux（AppImage）可自动下载，并按 blockmap 做增量更新。
-const canAutoInstall = process.platform !== 'darwin';
-let manualUpdateCheck = false;
+// 能自动下载并安装安装包的平台：Windows（NSIS）与 Linux（AppImage）。
+// deb 没有 electron-updater 的安装器，macOS 未签名时 Squirrel.Mac 无法校验安装包，
+// 这两个平台只引导去发布页手动下载，否则会在下载/安装阶段报一个用户看不懂的错。
+const canAutoInstall =
+  process.platform === 'darwin' ? false : process.platform !== 'linux' || !!process.env.APPIMAGE;
+
+/**
+ * 更新状态机：主进程是唯一真源。设置页「关于」通过 update:status 拉一次快照，
+ * 之后靠 update:state 广播增量；主窗口红点也读同一份状态。
+ *   idle → checking → available → downloading → downloaded（→ 重启安装）
+ *                  ↘ up-to-date         ↘ error
+ * 检测全程静默（不弹窗、不自动下载），下载必须由用户在设置页点「下载更新」确认。
+ */
+let updateState = {
+  phase: 'idle', // idle | checking | available | downloading | downloaded | up-to-date | error | dev
+  version: '',
+  percent: 0,
+  transferred: 0,
+  total: 0,
+  bytesPerSecond: 0,
+  error: '',
+};
+let lastProgressSentAt = 0;
+let manualUpdateCheck = false; // 只有手动检查才把「已是最新 / 失败」这类结果推到界面
+let updateDownloading = false;
+
+function setUpdateState(patch) {
+  updateState = { ...updateState, ...patch };
+  broadcast('update:state', updateState);
+}
+
+/** 设置页初始化 / 红点判断用的完整快照（附带静态能力信息） */
+function updateStatus() {
+  return {
+    ...updateState,
+    currentVersion: app.getVersion(),
+    releasePage: RELEASE_PAGE,
+    packaged: app.isPackaged,
+    canAutoInstall,
+  };
+}
+
+/** --update-mock=<phase>：截图/调试专用，伪造一次更新状态（真实流程不会调用） */
+function mockUpdateState(phase) {
+  const total = 30 * 1024 * 1024;
+  // 伪造版本号按当前版本 +1 推算，不写死：否则每发一版调试参数里的版本号就会过期
+  const [major, minor, patch] = app.getVersion().split('.').map(Number);
+  const fakeVersion = `${major}.${minor}.${(patch || 0) + 1}`;
+  const table = {
+    idle: {},
+    checking: { phase: 'checking' },
+    'up-to-date': { phase: 'up-to-date', version: '' },
+    available: { phase: 'available', version: fakeVersion },
+    downloading: {
+      phase: 'downloading',
+      version: fakeVersion,
+      percent: 42,
+      transferred: 12.3 * 1024 * 1024,
+      total,
+      bytesPerSecond: 2.1 * 1024 * 1024,
+    },
+    downloaded: { phase: 'downloaded', version: fakeVersion, percent: 100 },
+    error: { phase: 'error', error: 'net::ERR_CONNECTION_RESET' },
+    dev: { phase: 'dev' },
+  };
+  setUpdateState({ ...table[phase], version: table[phase]?.version ?? '', error: table[phase]?.error ?? '' });
+}
+
+/** 发起检查。manual=true 表示用户点的按钮，结果要显示在设置页；后台检查只去发现新版本 */
+function startUpdateCheck(manual) {
+  if (!app.isPackaged) {
+    // 开发模式没有 latest.yml，检查必然失败：直接把说明显示在设置页，不弹窗
+    if (manual) setUpdateState({ phase: 'dev', version: '', error: '', percent: 0 });
+    return;
+  }
+  // 只有手动检查才置 manualUpdateCheck=true；后台检查不覆写它——
+  // 否则 6 小时定时器恰好落在手动检查进行中时，会把 manual 结果吞掉，UI 卡在「检查中」
+  if (manual) manualUpdateCheck = true;
+  if (manual) setUpdateState({ phase: 'checking', version: '', error: '', percent: 0, transferred: 0, total: 0 });
+  autoUpdater.checkForUpdates().catch((e) => console.error('[update] 检查失败：', e));
+}
+
+/** 用户确认后开始下载；进度由 download-progress 事件推送 */
+async function downloadUpdate() {
+  if (!app.isPackaged || !canAutoInstall) return { ok: false, reason: 'unsupported' };
+  if (updateState.phase !== 'available') return { ok: false, reason: 'no-update' };
+  if (updateDownloading) return { ok: true };
+  updateDownloading = true;
+  lastProgressSentAt = 0;
+  setUpdateState({ phase: 'downloading', percent: 0, transferred: 0, total: 0, bytesPerSecond: 0, error: '' });
+  try {
+    await autoUpdater.downloadUpdate();
+  } catch (e) {
+    // 具体原因由 error 事件写进状态，这里只记录，避免 unhandled rejection
+    console.error('[update] 下载失败：', e);
+  } finally {
+    updateDownloading = false;
+  }
+  return { ok: true };
+}
+
+/** 重启并安装；不支持自动安装的平台退回打开发布页 */
+function installUpdate() {
+  if (!canAutoInstall) {
+    shell.openExternal(RELEASE_PAGE);
+    return { ok: true, opened: true };
+  }
+  if (updateState.phase !== 'downloaded') return { ok: false, reason: 'not-ready' };
+  // 推迟到 IPC 响应之后再退出，否则渲染层可能拿不到响应
+  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  return { ok: true };
+}
 
 function setupAutoUpdate() {
+  // --update-mock=<phase>：截图/调试专用，伪造更新状态机（真实流程不会调用；不打包进任何正式流程）
+  const mockPhase = argValue('update-mock');
+  if (mockPhase) {
+    mockUpdateState(mockPhase);
+    return;
+  }
   if (!app.isPackaged) return; // 开发模式不检查更新
-  autoUpdater.autoDownload = canAutoInstall;
-  autoUpdater.autoInstallOnAppQuit = canAutoInstall;
-
+  autoUpdater.autoDownload = false; // 关键：不再后台静默下载，等用户确认
+  autoUpdater.autoInstallOnAppQuit = canAutoInstall; // 已下载的更新随正常退出安装
   autoUpdater.on('update-available', (info) => {
-    if (canAutoInstall) return; // 自动下载完成后在 update-downloaded 里提示
-    dialog.showMessageBox(win, {
-      type: 'info',
-      title: tr('update.newVersion.title'),
-      message: tr('update.newVersion.message', { version: info.version }),
-      detail: tr('update.newVersion.detail'),
-      buttons: [tr('button.openRelease'), tr('button.later')],
-      defaultId: 0,
-      cancelId: 1,
-    }).then(({ response }) => {
-      if (response === 0) shell.openExternal(RELEASE_PAGE);
+    // 后台定时检查（每 6 小时）会再次触发这个事件；下载中/已下载时不回退状态，
+    // 否则进度条与「重启并安装」按钮会被重置掉（与下方 update-not-available 的守卫对称）
+    if (updateState.phase === 'downloading' || updateState.phase === 'downloaded') return;
+    setUpdateState({ phase: 'available', version: info.version, error: '', percent: 0 });
+  });
+
+  autoUpdater.on('download-progress', (p) => {
+    // 事件频率很高，节流到约 4 次/秒：IPC 与进度条不需要更细的粒度
+    const now = Date.now();
+    if (now - lastProgressSentAt < 250 && Number(p.percent) < 99.5) return;
+    lastProgressSentAt = now;
+    setUpdateState({
+      phase: 'downloading',
+      percent: Math.max(0, Math.min(100, Number(p.percent) || 0)),
+      transferred: Number(p.transferred) || 0,
+      total: Number(p.total) || 0,
+      bytesPerSecond: Number(p.bytesPerSecond) || 0,
     });
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    dialog.showMessageBox(win, {
-      type: 'info',
-      title: tr('update.ready.title'),
-      message: tr('update.ready.message', { version: info.version }),
-      detail: tr('update.ready.detail'),
-      buttons: [tr('button.restartNow'), tr('button.later')],
-      defaultId: 0,
-      cancelId: 1,
-    }).then(({ response }) => {
-      if (response === 0) autoUpdater.quitAndInstall(false, true);
-    });
+    setUpdateState({ phase: 'downloaded', version: info.version, percent: 100, error: '' });
   });
 
   autoUpdater.on('update-not-available', () => {
+    // 后台静默检查没有新版本时不打扰用户，只有手动检查才把结果写到设置页
     if (!manualUpdateCheck) return;
     manualUpdateCheck = false;
-    dialog.showMessageBox(win, {
-      type: 'info',
-      title: tr('update.latest.title'),
-      message: tr('update.latest.message', { version: app.getVersion() }),
-      buttons: [tr('button.ok')],
-    });
+    if (updateState.phase === 'downloading' || updateState.phase === 'downloaded') return;
+    setUpdateState({ phase: 'up-to-date', version: '', error: '', percent: 0 });
   });
 
   autoUpdater.on('error', (err) => {
     console.error('[update] 失败：', err);
-    const wasManual = manualUpdateCheck;
+    const manual = manualUpdateCheck;
     manualUpdateCheck = false;
-    if (!wasManual) return;
-    dialog.showMessageBox(win, {
-      type: 'warning',
-      title: tr('update.failed.title'),
-      message: tr('update.failed.message'),
-      detail: String(err?.message || err),
-      buttons: [tr('button.openRelease'), tr('button.close')],
-      defaultId: 0,
-      cancelId: 1,
-    }).then(({ response }) => {
-      if (response === 0) shell.openExternal(RELEASE_PAGE);
-    });
+    // 后台检查出错（断网等）只记日志，不把设置页污染成错误状态；下载失败必须显示出来。
+    // 下载刚完成、finally 还没复位 updateDownloading 的极窄窗口里错误仍可能到达，
+    // 用 phase 守卫兜底，避免把 downloaded 覆盖成 error（红点消失、安装按钮不可达）
+    if (!manual && !updateDownloading) return;
+    if (updateState.phase === 'downloading' || updateState.phase === 'downloaded') return;
+    setUpdateState({ phase: 'error', error: String(err?.message || err) });
   });
 
-  const check = (manual) => {
-    manualUpdateCheck = manual;
-    autoUpdater.checkForUpdates().catch((e) => console.error('[update] 检查失败：', e));
-  };
-  // 启动 8 秒后检查一次，之后每 6 小时检查一次
-  setTimeout(() => check(false), 8000);
-  setInterval(() => check(false), 6 * 60 * 60 * 1000);
-}
-
-async function checkUpdatesManually() {
-  if (!app.isPackaged) {
-    await dialog.showMessageBox(win, {
-      type: 'info',
-      title: tr('update.dev.title'),
-      message: tr('update.dev.message'),
-      detail: tr('update.dev.detail'),
-      buttons: [tr('button.ok')],
-    });
-    return;
-  }
-  manualUpdateCheck = true;
-  autoUpdater.checkForUpdates().catch((e) => console.error('[update] 检查失败：', e));
+  // 启动 8 秒后检查一次，之后每 6 小时检查一次；发现新版本只更新状态（主窗口红点），等用户确认再下载
+  setTimeout(() => startUpdateCheck(false), 8000);
+  setInterval(() => startUpdateCheck(false), 6 * 60 * 60 * 1000);
 }
 
 /* ---------- 菜单（保留常用项，避免默认 Electron 英文菜单） ---------- */
@@ -863,13 +947,19 @@ app.whenReady().then(() => {
       .then((info) => console.log('[lan-auto] listening', JSON.stringify({ port: info.port, token: info.token, urls: info.urls })))
       .catch((e) => console.error('[lan-auto] failed', e));
   }
+  // 兜底：正常情况下关掉最后一个窗口就直接退出（见下方 window-all-closed），
+  // 只有异常启动导致没有窗口时，才需要点 Dock 图标重新建主窗口。
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
+// 本项目不做后台常驻：任何平台关掉最后一个窗口就退出进程。
+// macOS 的惯例是保留应用进程（关窗 ≠ 退出），但本应用既没有菜单栏托盘，
+// 也没有必须活到进程退出之后的任务——更新检查定时器和局域网直传接收器
+// 都随进程存活，留着后台跑只会让用户以为已经关掉，还继续占着端口。
 app.on('window-all-closed', () => {
-  if (!isMac) app.quit();
+  app.quit();
 });
 
 // 退出时关掉接收器（UDP 广播与 HTTP 端口都要释放）

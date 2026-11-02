@@ -4,10 +4,15 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   store,
   lan,
+  update,
   pickZip,
   pickFolder,
   showToast,
   refreshLanStatus,
+  refreshUpdateStatus,
+  checkForUpdates,
+  downloadUpdate,
+  installUpdate,
   lanEnable,
   lanDisable,
   lanRegenerateToken,
@@ -93,16 +98,83 @@ const buildInfo = computed(() => {
   return t('settings.buildInfo', { electron: v.electron || '—', chrome: v.chrome || '—' });
 });
 
-// 检查更新：开发模式由主进程弹说明，正式包走 electron-updater（结果也在主进程弹窗）
-const checkingUpdates = ref(false);
-async function checkUpdates() {
-  if (checkingUpdates.value) return;
-  checkingUpdates.value = true;
-  try {
-    await window.api.checkUpdates();
-  } finally {
-    setTimeout(() => (checkingUpdates.value = false), 1200);
+/* ---- 自动更新（状态真源在主进程，这里只做展示与动作） ---- */
+const updateBusy = computed(() => update.phase === 'checking' || update.phase === 'downloading');
+const canConfirmDownload = computed(() => update.phase === 'available' && update.canAutoInstall);
+const canReinstall = computed(() => update.phase === 'downloaded' && update.canAutoInstall);
+// 主窗口齿轮 / 侧边栏「关于」的红点：有新版本或已下载待安装
+const updateReady = computed(() => update.phase === 'available' || update.phase === 'downloaded');
+
+const updateStateText = computed(() => {
+  const ver = update.version || '—';
+  switch (update.phase) {
+    case 'checking':
+      return t('settings.update.checking');
+    case 'available':
+      return t('settings.update.available', { version: ver });
+    case 'downloading':
+      return t('settings.update.downloading', { version: ver });
+    case 'downloaded':
+      return t('settings.update.downloaded', { version: ver });
+    case 'up-to-date':
+      return t('settings.update.upToDate', { version: update.currentVersion || version.value || '—' });
+    case 'error':
+      return t('settings.update.failed', { error: update.error || '—' });
+    case 'dev':
+      return t('settings.update.dev');
+    default:
+      return t('settings.update.idle');
   }
+});
+
+const updateBadgeText = computed(() => {
+  switch (update.phase) {
+    case 'checking':
+      return t('settings.update.badgeChecking');
+    case 'available':
+      return t('settings.update.badgeAvailable');
+    case 'downloaded':
+      return t('settings.update.badgeDownloaded');
+    case 'up-to-date':
+      return t('settings.update.badgeLatest');
+    case 'error':
+      return t('settings.update.badgeError');
+    case 'dev':
+      return t('settings.update.badgeDev');
+    default:
+      return '';
+  }
+});
+const updateBadgeClass = computed(() => ({
+  accent: update.phase === 'available' || update.phase === 'downloading',
+  ok: update.phase === 'up-to-date' || update.phase === 'downloaded',
+}));
+
+const updateHint = computed(() => {
+  if (update.phase === 'available') {
+    return update.canAutoInstall ? t('settings.update.confirmHint') : t('settings.update.manualHint');
+  }
+  if (update.phase === 'downloaded') return t('settings.update.installHint');
+  return '';
+});
+
+/** 进度行：「42% · 12.3 MB / 29.4 MB · 2.1 MB/s」 */
+const updateProgressDetail = computed(() => {
+  const parts = [`${Math.round(update.percent)}%`];
+  if (update.total > 0) parts.push(`${fmtBytes(update.transferred)} / ${fmtBytes(update.total)}`);
+  if (update.bytesPerSecond > 0) parts.push(`${fmtBytes(update.bytesPerSecond)}/s`);
+  return parts.join(' · ');
+});
+
+async function onCheckUpdates() {
+  if (updateBusy.value) return;
+  await checkForUpdates();
+}
+async function onDownloadUpdate() {
+  await downloadUpdate();
+}
+async function onInstallUpdate() {
+  await installUpdate();
 }
 
 function openReleasePage() {
@@ -191,7 +263,11 @@ function openStadiaConsole() {
   window.api.openExternal('https://client.stadiamaps.com/dashboard/');
 }
 
-onMounted(() => refreshLanStatus());
+onMounted(() => {
+  refreshLanStatus();
+  // 更新状态由主进程静默维护，打开设置页时补拉一次，避免错过挂载前的广播
+  refreshUpdateStatus();
+});
 </script>
 
 <template>
@@ -206,7 +282,7 @@ onMounted(() => refreshLanStatus());
             v-for="item in group.items"
             :key="item.key"
             class="settings-nav-item"
-            :class="{ active: tab === item.key }"
+            :class="{ active: tab === item.key, 'has-dot': item.key === 'about' && updateReady }"
             :aria-current="tab === item.key ? 'page' : undefined"
             @click="selectTab(item.key)"
           >
@@ -231,6 +307,8 @@ onMounted(() => refreshLanStatus());
               </svg>
             </span>
             {{ t(item.label) }}
+            <!-- 有新版本 / 已下载待安装：与主窗口齿轮一致的红点提示 -->
+            <span v-if="item.key === 'about' && updateReady" class="nav-dot" aria-hidden="true"></span>
           </button>
         </div>
       </nav>
@@ -498,14 +576,42 @@ onMounted(() => refreshLanStatus());
             <span class="settings-label">{{ t('settings.build') }}</span>
             <span class="muted">{{ buildInfo }}</span>
           </div>
-          <div class="settings-row">
-            <span class="settings-label">{{ t('settings.updates') }}</span>
-            <div class="segmented">
-              <button class="btn primary small" :disabled="checkingUpdates" @click="checkUpdates">
-                {{ checkingUpdates ? t('settings.checking') : t('settings.checkUpdates') }}
-              </button>
-              <button class="btn ghost small" @click="openReleasePage">{{ t('settings.openRelease') }}</button>
+        </div>
+
+        <!-- 更新：检测静默进行，结果与下载进度都显示在这里（不再弹原生对话框） -->
+        <div class="card update-card" :class="'is-' + update.phase">
+          <div class="card-head">
+            <h3>{{ t('settings.updates') }}</h3>
+            <span v-if="updateBadgeText" class="badge" :class="updateBadgeClass">{{ updateBadgeText }}</span>
+          </div>
+          <p class="update-state">{{ updateStateText }}</p>
+          <p v-if="updateHint" class="update-hint">{{ updateHint }}</p>
+
+          <!-- 下载进度：主进程节流后推送 percent / 已传输 / 总量 / 速度 -->
+          <div v-if="update.phase === 'downloading'" class="update-progress">
+            <div
+              class="progress-track"
+              role="progressbar"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-valuenow="Math.round(update.percent)"
+            >
+              <div class="progress-fill" :style="{ width: update.percent + '%' }"></div>
             </div>
+            <span class="progress-num">{{ updateProgressDetail }}</span>
+          </div>
+
+          <div class="update-actions">
+            <button class="btn small" :disabled="updateBusy" @click="onCheckUpdates">
+              {{ update.phase === 'checking' ? t('settings.checking') : t('settings.checkUpdates') }}
+            </button>
+            <button v-if="canConfirmDownload" class="btn primary small" @click="onDownloadUpdate">
+              {{ t('settings.update.download') }}
+            </button>
+            <button v-if="canReinstall" class="btn primary small" @click="onInstallUpdate">
+              {{ t('settings.update.install') }}
+            </button>
+            <button class="btn ghost small" @click="openReleasePage">{{ t('settings.openRelease') }}</button>
           </div>
         </div>
 

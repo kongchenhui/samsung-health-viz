@@ -72,6 +72,16 @@ samsung-health-viz/
 记住每个分栏的位置。返回列表页（如从骑行详情返回）会回到原来的滚动位置。
 新增页面 / 分栏沿用这套机制，不要在其它组件里直接改这两个容器的滚动位置。
 
+### 窗口生命周期与退出
+
+关掉最后一个窗口就退出应用：`window-all-closed` 里直接 `app.quit()`，macOS 也一样。
+本项目没有菜单栏托盘，也没有需要在后台继续跑的任务（更新检查定时器、局域网直传
+接收器都只随进程存活），所以不保留常驻进程——macOS 上保留应用的惯例会让 Dock 图标
+一直亮着，用户会误以为没关掉，后台还占着局域网端口。
+
+关闭主窗口会顺带关掉设置窗口，随后进程退出；`before-quit` 负责释放局域网接收器的
+HTTP 端口与 UDP 广播。不要为了“贴合 macOS 习惯”改回 `if (!isMac) app.quit()`。
+
 ## 数据来源与解析规则
 
 只读解析以下文件（不修改原始数据包）：
@@ -178,17 +188,31 @@ pnpm dist:linux   # Linux：AppImage + deb（在 Linux 或 Docker/CI 上运行�
 
 ### 自动更新
 
-已集成 `electron-updater`，从 GitHub Release 检查并更新（`build.publish` 已配置为 GitHub）：
+已集成 `electron-updater`，从 GitHub Release 检查并更新（`build.publish` 已配置为 GitHub）。
+**检测静默、下载需确认、结果只在设置页显示**，不再弹原生对话框：
 
-- 应用启动 8 秒后检查一次，之后每 6 小时检查；「设置 → 关于 → 检查更新」可手动检查；
+- 检测：启动 8 秒后检查一次，之后每 6 小时一次；后台检测没有新版本 / 断网时不打扰用户（只写日志），
+  发现新版本只更新状态，不自动下载；
+- 提示：主窗口设置齿轮与设置侧边栏「关于」出现红点（有新版本或已下载待安装），点击直达
+  `设置 → 关于`；除此之外不做 Toast / 弹窗；
+- 下载：`autoDownload = false`，用户点「下载更新」才开始；进度条显示百分比 + 已下载/总量 + 速度，
+  主进程对 `download-progress` 节流到约 4 次/秒再广播；下载中「检查更新」按钮禁用；
+- 安装：下载完成后点「重启并安装」（`quitAndInstall`）；`autoInstallOnAppQuit` 保留，
+  已下载的更新在正常退出应用时也会自动安装；
 - 增量更新依赖 electron-builder 生成的 `latest*.yml` + `*.blockmap`，CI 发布时一并上传；
-- Windows（NSIS）：自动下载并做**差量更新**，完成后提示重启安装；
-- Linux（AppImage）：自动下载并更新（支持 blockmap 差量）；deb 版不支持自动更新；
-- macOS：Squirrel.Mac 要求校验代码签名，当前构建**未签名**，因此只提示「发现新版本」并打开发布页，不会自动安装；
-  配置 Developer ID 签名后可开启自动安装。
+- 平台差异：Windows（NSIS）与 Linux（AppImage）可下载并自动安装（支持 blockmap 差量）；
+  Linux deb 没有 electron-updater 安装器、macOS 未签名时 Squirrel.Mac 无法校验安装包，
+  这两个平台只引导去发布页手动下载（`canAutoInstall` 据此判定）；
+- 状态机与 IPC：主进程 `main.mjs` 维护 `idle → checking → available → downloading → downloaded`
+  （以及 `up-to-date` / `error` / `dev`），渲染层通过 `update:status` 拉快照、`update:state` 收广播，
+  动作走 `update:check` / `update:download` / `update:install`；设置页只做展示，不自己推断状态。
 
-发布新版本：改 `package.json` 的 `version` → 新增 `docs/release-notes/vX.Y.Z.md` → 打 tag 推送，
+发布新版本：改 `package.json` 的 `version`（同时改 `android/app/build.gradle` 的 `versionCode` /
+`versionName`）→ 新增 `docs/release-notes/vX.Y.Z.md` → 打 tag 推送，
 CI 自动构建并发布，已安装的客户端即可检查到更新。
+
+`docs/release-notes/` 只保留有对应 tag 的版本说明（Release 说明由 CI 按 `<tag>.md` 读取）；
+没有 tag 的说明文件不会被任何流程用到，历史版本说明查 git 历史即可。
 
 ### CI / Docker
 
@@ -196,7 +220,7 @@ CI 自动构建并发布，已安装的客户端即可检查到更新。
 
 **GitHub Actions**（`.github/workflows/build.yml`）：
 
-- 触发：手动触发，或推送 `v*` 版本 tag（推荐：`git tag v0.0.6 && git push origin v0.0.6`）；
+- 触发：手动触发，或推送 `v*` 版本 tag（推荐：`git tag v0.0.11 && git push origin v0.0.11`）；
 - 在 `macos-latest` / `windows-latest` / `ubuntu-latest` 上分别打包，产物以 artifact 上传；
 - `android` job 构建手机直传 App 的 debug APK（artifact `android-apk`）；
 - 最后的 `release` job 先校验 tag 与 `package.json` 的 `version` 一致，再汇总三平台安装包与 APK，
@@ -236,6 +260,7 @@ pnpm check:lan      # 只跑局域网直传
 | `--shot-page=<hash>` | 截图前跳转到指定路由（如 `/settings`） |
 | `--shot-js=<js>` | 截图前在渲染进程执行一段 JS，可返回结果打印到控制台 |
 | `--headless` | 窗口只在内存里渲染、不真正显示；配合 `--shot` 批量截图时不抢焦点、不打扰用户 |
+| `--update-mock=<phase>` | 伪造自动更新状态（`idle` / `available` / `downloading` / `downloaded` / `up-to-date` / `error`）后跳过真实检查，用于截设置页「关于」与主窗口红点 |
 | `--lan-auto` | 启动时直接开启局域网接收器（不开界面也能收手机上传） |
 
 示例（在 `pnpm dev` 起好的 Vite 服务上另开一个实例）：
